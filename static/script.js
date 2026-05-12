@@ -3,6 +3,8 @@ let resumes = [];
 let currentResults = null;
 let candidateAnalysis = null;
 let currentMode = 'recruiter';
+let selectedJDIndex = 0;
+let selectedCandidateJDIndex = 0;
 
 // ===== DOM ELEMENTS =====
 const dropArea = document.getElementById("dropArea");
@@ -14,6 +16,9 @@ const resultsSection = document.getElementById("resultsSection");
 const resultsContent = document.getElementById("resultsContent");
 const loadingSpinner = document.getElementById("loadingSpinner");
 const jdText = document.getElementById("jdText");
+const jdFileInput = document.getElementById("jdFile");
+const jdFileCount = document.getElementById("jdFileCount");
+const jdFileList = document.getElementById("jdFileList");
 const charCount = document.getElementById("charCount");
 const fileCount = document.getElementById("fileCount");
 const sortSelect = document.getElementById("sortSelect");
@@ -23,6 +28,8 @@ const closeModal = document.querySelector(".close-modal");
 const modalBody = document.getElementById("modalBody");
 const skillsContainer = document.getElementById("skillsContainer");
 const statsGrid = document.getElementById("statsGrid");
+const resultsSummary = document.querySelector(".results-summary");
+const resultsHeader = document.querySelector(".results-header");
 
 // Candidate View Elements
 const modeToggle = document.querySelector('.mode-toggle');
@@ -34,18 +41,26 @@ const candidateView = document.getElementById('candidateView');
 const candidateResults = document.getElementById('candidateResults');
 
 const candidateResumeInput = document.getElementById('candidateResume');
+const candidateResumePreview = document.getElementById('candidateResumePreview');
+const candidateResumeName = document.getElementById('candidateResumeName');
 const candidateJDText = document.getElementById('candidateJD');
 const candidateCharCount = document.getElementById('candidateCharCount');
+const candidateJDFileInput = document.getElementById('candidateJDFile');
+const candidateJDFileCount = document.getElementById('candidateJDFileCount');
+const candidateJDFileList = document.getElementById('candidateJDFileList');
+const candidateJDSelectorWrap = document.getElementById('candidateJDSelectorWrap');
+const candidateJDSelect = document.getElementById('candidateJDSelect');
 const analyzeCandidateBtn = document.getElementById('analyzeCandidateBtn');
 const candidateFitCircle = document.getElementById('candidateFitCircle');
 const candidateFitScore = document.getElementById('candidateFitScore');
 const fitFeedback = document.getElementById('fitFeedback');
 const candidateMatched = document.getElementById('candidateMatched');
 const candidateMissing = document.getElementById('candidateMissing');
-const candidateExtra = document.getElementById('candidateExtra');
-const learningPath = document.getElementById('learningPath');
+const candidateInsights = document.getElementById('candidateInsights');
+const candidateActionHigh = document.getElementById('candidateActionHigh');
+const candidateActionMedium = document.getElementById('candidateActionMedium');
+const candidateActionOptional = document.getElementById('candidateActionOptional');
 const alternativeRoles = document.getElementById('alternativeRoles');
-const improvementTips = document.getElementById('improvementTips');
 const actionPlan = document.getElementById('actionPlan');
 const exportPlanBtn = document.getElementById('exportPlanBtn');
 
@@ -68,6 +83,8 @@ function initializeApp() {
     candidateJDText.addEventListener("input", () => {
         candidateCharCount.textContent = candidateJDText.value.length;
     });
+    candidateResumeInput.addEventListener("change", handleCandidateResumeChange);
+    candidateJDFileInput.addEventListener("change", handleCandidateJDFileSelection);
 
     // Drag and drop functionality
     dropArea.addEventListener("dragover", handleDragOver);
@@ -76,6 +93,7 @@ function initializeApp() {
     
     // File input
     resumeInput.addEventListener("change", handleFileSelect);
+    jdFileInput.addEventListener("change", handleJDFileSelection);
     
     // Buttons
     analyzeBtn.addEventListener("click", analyzeResumes);
@@ -97,6 +115,9 @@ function initializeApp() {
     // Trigger initial character count
     jdText.dispatchEvent(new Event('input'));
     candidateJDText.dispatchEvent(new Event('input'));
+    handleCandidateResumeChange();
+    handleJDFileSelection();
+    handleCandidateJDFileSelection();
 }
 
 // ===== MODE SWITCHING =====
@@ -136,6 +157,18 @@ function switchMode(mode) {
             candidateResults.style.display = 'block';
         }
     }
+
+    updateRecruiterCompactMode();
+}
+
+function updateRecruiterCompactMode() {
+    const recruiterActive = currentMode === 'recruiter';
+    const recruiterResultsVisible = resultsSection.style.display === 'block';
+    document.body.classList.toggle('recruiter-compact', recruiterActive && !recruiterResultsVisible);
+
+    const candidateActive = currentMode === 'candidate';
+    const candidateResultsVisible = candidateResults.style.display === 'block';
+    document.body.classList.toggle('candidate-compact', candidateActive && !candidateResultsVisible);
 }
 
 // ===== DRAG & DROP HANDLERS =====
@@ -158,6 +191,75 @@ function handleDrop(e) {
 function handleFileSelect(e) {
     const files = Array.from(e.target.files);
     addFiles(files);
+}
+
+function handleJDFileSelection() {
+    const jdFiles = Array.from(jdFileInput.files || []);
+    const label = `${jdFiles.length} JD file${jdFiles.length === 1 ? "" : "s"} selected`;
+    jdFileCount.textContent = label;
+
+    jdFileList.innerHTML = "";
+    jdFiles.forEach(file => {
+        const item = document.createElement("li");
+        const fileSize = (file.size / 1024 / 1024).toFixed(2);
+        item.innerHTML = `
+            <i class="fas ${getFileIcon(file.name)}"></i>
+            <span class="jd-file-name">${escapeHtml(file.name)}</span>
+            <span class="jd-file-size">${fileSize} MB</span>
+        `;
+        jdFileList.appendChild(item);
+    });
+}
+
+function handleCandidateResumeChange() {
+    const resumeFile = candidateResumeInput.files[0];
+
+    if (!resumeFile) {
+        candidateResumePreview.style.display = "none";
+        candidateResumeName.textContent = "";
+        return;
+    }
+
+    const validTypes = [".pdf", ".docx", ".txt"];
+    const fileExt = "." + resumeFile.name.split('.').pop().toLowerCase();
+
+    if (!validTypes.includes(fileExt)) {
+        showNotification(`File type not supported: ${fileExt}`, "error");
+        candidateResumeInput.value = "";
+        candidateResumePreview.style.display = "none";
+        candidateResumeName.textContent = "";
+        return;
+    }
+
+    if (resumeFile.size > 10 * 1024 * 1024) {
+        showNotification(`File "${resumeFile.name}" is too large (max 10MB)`, "error");
+        candidateResumeInput.value = "";
+        candidateResumePreview.style.display = "none";
+        candidateResumeName.textContent = "";
+        return;
+    }
+
+    const fileSizeMb = (resumeFile.size / 1024 / 1024).toFixed(2);
+    candidateResumeName.textContent = `${resumeFile.name} (${fileSizeMb} MB)`;
+    candidateResumePreview.style.display = "flex";
+}
+
+function handleCandidateJDFileSelection() {
+    const jdFiles = Array.from(candidateJDFileInput.files || []);
+    const label = `${jdFiles.length} JD file${jdFiles.length === 1 ? "" : "s"} selected`;
+    candidateJDFileCount.textContent = label;
+
+    candidateJDFileList.innerHTML = "";
+    jdFiles.forEach(file => {
+        const item = document.createElement("li");
+        const fileSize = (file.size / 1024 / 1024).toFixed(2);
+        item.innerHTML = `
+            <i class="fas ${getFileIcon(file.name)}"></i>
+            <span class="jd-file-name">${escapeHtml(file.name)}</span>
+            <span class="jd-file-size">${fileSize} MB</span>
+        `;
+        candidateJDFileList.appendChild(item);
+    });
 }
 
 // ===== FILE MANAGEMENT =====
@@ -238,12 +340,15 @@ function removeFile(name, size) {
 }
 
 function clearAllFiles() {
-    if (resumes.length === 0) return;
+    const hasJDFiles = (jdFileInput.files || []).length > 0;
+    if (resumes.length === 0 && !hasJDFiles) return;
     
     if (confirm("Are you sure you want to clear all uploaded files?")) {
         resumes = [];
         fileList.innerHTML = "";
         updateFileCount();
+        jdFileInput.value = "";
+        handleJDFileSelection();
         showNotification("All files cleared", "success");
     }
 }
@@ -269,15 +374,25 @@ async function analyzeResumes() {
     
     try {
         const formData = new FormData();
+        const jdFiles = Array.from(jdFileInput.files || []);
+        const validTypes = [".pdf", ".docx", ".txt"];
         
         // Add JD text
         if (jdText.value.trim()) {
             formData.append("jd_text", jdText.value);
         }
         
-        // Add JD file if exists
-        const jdFile = document.getElementById("jdFile").files[0];
-        if (jdFile) {
+        // Add JD files (supports multiple uploads)
+        for (const jdFile of jdFiles) {
+            const fileExt = "." + jdFile.name.split('.').pop().toLowerCase();
+            if (!validTypes.includes(fileExt)) {
+                showNotification(`JD file type not supported: ${fileExt}`, "error");
+                return;
+            }
+            if (jdFile.size > 10 * 1024 * 1024) {
+                showNotification(`JD file "${jdFile.name}" is too large (max 10MB)`, "error");
+                return;
+            }
             formData.append("jd_file", jdFile);
         }
         
@@ -304,9 +419,15 @@ async function analyzeResumes() {
         
         // Show results section
         resultsSection.style.display = "block";
+        updateRecruiterCompactMode();
         resultsSection.scrollIntoView({ behavior: "smooth" });
         
-        showNotification("Analysis complete!", "success");
+        const jdCount = getJdAnalyses(data).length;
+        if (jdCount > 1) {
+            showNotification("Select Job Description to view analysis results", "success");
+        } else {
+            showNotification("Analysis complete!", "success");
+        }
         
     } catch (error) {
         console.error("Analysis error:", error);
@@ -321,38 +442,292 @@ async function analyzeResumes() {
 
 // ===== RENDER RECRUITER RESULTS =====
 function renderResults(data) {
-    // Clear previous results
+    const analyses = getJdAnalyses(data);
+    const isMultiJD = analyses.length > 1;
+
     resultsContent.innerHTML = "";
     skillsContainer.innerHTML = "";
     statsGrid.innerHTML = "";
-    
-    // 1. Render required skills
-    renderRequiredSkills(data.required_skills);
-    
-    // 2. Render statistics
-    renderStatistics(data);
-    
-    // 3. Render comparison table
-    renderComparisonTable(data.results);
+
+    setResultsLayoutMode(isMultiJD);
+
+    if (!isMultiJD) {
+        selectedJDIndex = 0;
+        const analysis = analyses[0] || { required_skills: [], results: [], statistics: {} };
+        const sortedResults = getSortedResults(analysis.results || []);
+
+        renderRequiredSkills(analysis.required_skills, sortedResults, skillsContainer);
+        renderStatistics(analysis, statsGrid);
+        renderComparisonTable(sortedResults, resultsContent);
+        return;
+    }
+
+    renderMultiJDResults(analyses);
 }
 
-function renderRequiredSkills(skills) {
-    skills.forEach(skill => {
-        const chip = document.createElement("span");
-        chip.className = "skill-tag";
-        chip.textContent = skill.charAt(0).toUpperCase() + skill.slice(1);
-        chip.title = skill;
-        skillsContainer.appendChild(chip);
+function setResultsLayoutMode(isMultiJD) {
+    resultsSummary.style.display = isMultiJD ? "none" : "grid";
+    resultsHeader.style.display = isMultiJD ? "none" : "flex";
+}
+
+function getJdAnalyses(data) {
+    if (Array.isArray(data?.jd_analyses) && data.jd_analyses.length > 0) {
+        return data.jd_analyses.map((analysis, index) => ({
+            jd_name: analysis.jd_name || `JD ${index + 1}`,
+            jd_profile: analysis.jd_profile || {},
+            required_skills: analysis.required_skills || [],
+            results: analysis.results || [],
+            statistics: analysis.statistics || {}
+        }));
+    }
+
+    return [{
+        jd_name: "Job Description",
+        jd_profile: {},
+        required_skills: data?.required_skills || [],
+        results: data?.results || [],
+        statistics: data?.statistics || {}
+    }];
+}
+
+function getSortedResults(results) {
+    const sortedResults = [...(results || [])];
+    const sortBy = sortSelect.value;
+
+    switch (sortBy) {
+        case "name":
+            sortedResults.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+            break;
+        case "skills":
+            sortedResults.sort((a, b) => (b.matched?.length || 0) - (a.matched?.length || 0));
+            break;
+        case "fit":
+        default:
+            sortedResults.sort((a, b) => (b.fit || 0) - (a.fit || 0));
+    }
+
+    return sortedResults;
+}
+
+function renderMultiJDResults(analyses) {
+    if (selectedJDIndex < 0 || selectedJDIndex >= analyses.length) {
+        selectedJDIndex = 0;
+    }
+
+    const selectorPanel = document.createElement("div");
+    selectorPanel.className = "jd-selector-panel";
+
+    const options = analyses.map((analysis, index) => {
+        const candidateCount = (analysis.results || []).length;
+        return `<option value="${index}" ${index === selectedJDIndex ? "selected" : ""}>${escapeHtml(analysis.jd_name)} (${candidateCount} candidates)</option>`;
+    }).join("");
+
+    selectorPanel.innerHTML = `
+        <div class="jd-selector-title">
+            <i class="fas fa-filter"></i>
+            <span>Select Job Description to view analysis results</span>
+        </div>
+        <div class="jd-selector-control">
+            <label for="jdCompareSelect">Select JD</label>
+            <select id="jdCompareSelect">${options}</select>
+        </div>
+    `;
+
+    resultsContent.appendChild(selectorPanel);
+
+    const jdCompareSelect = selectorPanel.querySelector("#jdCompareSelect");
+    jdCompareSelect.addEventListener("change", (event) => {
+        selectedJDIndex = Number(event.target.value) || 0;
+        renderResults(currentResults);
     });
+
+    const selectedAnalysis = analyses[selectedJDIndex] || analyses[0];
+    renderSingleJDAnalysisBlock(selectedAnalysis, selectedJDIndex);
 }
 
-function renderStatistics(data) {
-    const results = data.results;
-    const avgFit = Math.round(results.reduce((sum, r) => sum + r.fit, 0) / results.length);
-    const maxFit = Math.max(...results.map(r => r.fit));
-    const minFit = Math.min(...results.map(r => r.fit));
-    const totalSkills = results.reduce((sum, r) => sum + r.matched.length + r.extras.length, 0);
-    const avgSkills = Math.round(totalSkills / results.length);
+function renderSingleJDAnalysisBlock(analysis, index) {
+    const sortedResults = getSortedResults(analysis.results || []);
+    const topFit = sortedResults[0]?.fit || 0;
+    const jdProfile = analysis.jd_profile || {};
+    const profileTools = (jdProfile.tools || []).slice(0, 8).join(", ") || "Not specified";
+    const profileKeywords = (jdProfile.keywords || []).slice(0, 8).join(", ") || "Not specified";
+    const profileExperience = jdProfile.experience_level || "Not specified";
+
+    const block = document.createElement("article");
+    block.className = "jd-result-block";
+    block.innerHTML = `
+        <div class="jd-result-header">
+            <h3><i class="fas fa-briefcase"></i> ${escapeHtml(analysis.jd_name || `JD ${index + 1}`)}</h3>
+            <div class="jd-result-meta">
+                <span>${sortedResults.length} candidates</span>
+                <span>Top fit: ${topFit}%</span>
+            </div>
+        </div>
+        <div class="jd-profile-strip">
+            <div><strong>Experience Level:</strong> ${escapeHtml(profileExperience)}</div>
+            <div><strong>Tools:</strong> ${escapeHtml(profileTools)}</div>
+            <div><strong>Keywords:</strong> ${escapeHtml(profileKeywords)}</div>
+        </div>
+        <div class="jd-summary-grid">
+            <div class="summary-card">
+                <i class="fas fa-tasks"></i>
+                <h3>Skill Coverage Insights</h3>
+                <div class="jd-skills-container skills-container"></div>
+            </div>
+            <div class="summary-card">
+                <i class="fas fa-chart-pie"></i>
+                <h3>Overall Statistics</h3>
+                <div class="jd-stats-grid stats-grid"></div>
+            </div>
+        </div>
+        <div class="results-header jd-inner-results-header">
+            <h3><i class="fas fa-user-tie"></i> Candidate Comparison</h3>
+        </div>
+        <div class="jd-table-container"></div>
+    `;
+
+    resultsContent.appendChild(block);
+
+    const skillsHost = block.querySelector(".jd-skills-container");
+    const statsHost = block.querySelector(".jd-stats-grid");
+    const tableHost = block.querySelector(".jd-table-container");
+
+    renderRequiredSkills(analysis.required_skills, sortedResults, skillsHost);
+    renderStatistics(analysis, statsHost);
+    renderComparisonTable(sortedResults, tableHost);
+}
+
+function renderRequiredSkills(skills, results = [], targetContainer = skillsContainer) {
+    const required = (skills || [])
+        .map(skill => (skill || "").trim())
+        .filter(Boolean)
+        .map(skill => ({ key: skill.toLowerCase(), label: toTitleCase(skill) }));
+
+    if (required.length === 0) {
+        targetContainer.innerHTML = `
+            <div class="skills-insights-empty">
+                <i class="fas fa-info-circle"></i>
+                <span>No required skills detected from the job description.</span>
+            </div>
+        `;
+        return;
+    }
+
+    const candidateCount = (results || []).length;
+    const matchedMap = new Map();
+    const missingMap = new Map();
+    required.forEach(({ key }) => {
+        matchedMap.set(key, 0);
+        missingMap.set(key, 0);
+    });
+
+    results.forEach(candidate => {
+        const matchedSet = new Set((candidate.matched || []).map(skill => (skill || "").trim().toLowerCase()));
+        const missingSet = new Set((candidate.missing || []).map(skill => (skill || "").trim().toLowerCase()));
+
+        required.forEach(({ key }) => {
+            if (matchedSet.has(key)) {
+                matchedMap.set(key, (matchedMap.get(key) || 0) + 1);
+            }
+            if (missingSet.has(key)) {
+                missingMap.set(key, (missingMap.get(key) || 0) + 1);
+            }
+        });
+    });
+
+    const skillStats = required.map(({ key, label }) => {
+        const matchedCount = matchedMap.get(key) || 0;
+        const missingCount = missingMap.get(key) || 0;
+        const coveragePct = candidateCount ? Math.round((matchedCount / candidateCount) * 100) : 0;
+
+        let tone = "gap";
+        if (coveragePct >= 70) {
+            tone = "strong";
+        } else if (coveragePct >= 40) {
+            tone = "moderate";
+        }
+
+        return { key, label, matchedCount, missingCount, coveragePct, tone };
+    });
+
+    const avgCoverage = skillStats.length
+        ? Math.round(skillStats.reduce((sum, item) => sum + item.coveragePct, 0) / skillStats.length)
+        : 0;
+
+    const topGap = [...skillStats]
+        .sort((a, b) => b.missingCount - a.missingCount || a.coveragePct - b.coveragePct)[0];
+    const bestCovered = [...skillStats]
+        .sort((a, b) => b.coveragePct - a.coveragePct || b.matchedCount - a.matchedCount)[0];
+
+    const renderedRows = skillStats
+        .sort((a, b) => b.missingCount - a.missingCount || a.coveragePct - b.coveragePct)
+        .map(item => `
+            <div class="skill-progress-item">
+                <div class="skill-progress-top">
+                    <span class="skill-progress-name">${escapeHtml(item.label)}</span>
+                    <span class="skill-progress-score">${item.matchedCount}/${candidateCount || 0}</span>
+                </div>
+                <div class="skill-progress-track">
+                    <span class="skill-progress-fill tone-${item.tone}" style="width: ${item.coveragePct}%"></span>
+                </div>
+                <div class="skill-progress-meta">
+                    <span>${item.coveragePct}% matched</span>
+                    <span>${item.missingCount} missing</span>
+                </div>
+            </div>
+        `)
+        .join("");
+
+    targetContainer.innerHTML = `
+        <div class="skills-insights">
+            <div class="skills-kpi-grid">
+                <div class="skills-kpi">
+                    <span class="skills-kpi-label">Coverage</span>
+                    <strong>${avgCoverage}%</strong>
+                </div>
+                <div class="skills-kpi">
+                    <span class="skills-kpi-label">Highest Gap</span>
+                    <strong>${topGap ? escapeHtml(topGap.label) : "None"}</strong>
+                </div>
+                <div class="skills-kpi">
+                    <span class="skills-kpi-label">Best Covered</span>
+                    <strong>${bestCovered ? escapeHtml(bestCovered.label) : "None"}</strong>
+                </div>
+            </div>
+            <div class="skills-progress-list">
+                ${renderedRows}
+            </div>
+        </div>
+    `;
+}
+
+function toTitleCase(value) {
+    return (value || "")
+        .split(/[\s_-]+/)
+        .filter(Boolean)
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function renderStatistics(data, targetGrid = statsGrid) {
+    const results = data.results || [];
+    targetGrid.innerHTML = "";
+
+    const avgFit = results.length
+        ? Math.round(results.reduce((sum, r) => sum + (r.fit || 0), 0) / results.length)
+        : 0;
+    const maxFit = results.length ? Math.max(...results.map(r => r.fit || 0)) : 0;
+    const totalSkills = results.reduce((sum, r) => sum + (r.matched?.length || 0) + (r.extras?.length || 0), 0);
+    const avgSkills = results.length ? Math.round(totalSkills / results.length) : 0;
     
     const stats = [
         { label: "Average Fit", value: `${avgFit}%`, icon: "fa-chart-line" },
@@ -369,127 +744,158 @@ function renderStatistics(data) {
             <div class="stat-value">${stat.value}</div>
             <div class="stat-label">${stat.label}</div>
         `;
-        statsGrid.appendChild(statItem);
+        targetGrid.appendChild(statItem);
     });
 }
 
-function renderComparisonTable(candidates) {
-    const tableContainer = document.createElement('div');
-    tableContainer.className = 'table-container';
-    
-    const table = document.createElement('table');
-    table.className = 'comparison-table';
-    
-    // Create table header
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
-    
-    const headers = [
-        { text: 'Resume Name', width: '20%' },
-        { text: 'Fit %', width: '10%' },
-        { text: 'Matched Skills', width: '25%' },
-        { text: 'Missing Skills', width: '25%' },
-        { text: 'Extra Skills', width: '20%' }
-    ];
-    
-    headers.forEach(header => {
-        const th = document.createElement('th');
-        th.textContent = header.text;
-        th.style.width = header.width;
-        headerRow.appendChild(th);
-    });
-    
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-    
-    // Create table body
-    const tbody = document.createElement('tbody');
-    
-    candidates.forEach((candidate, index) => {
-        const row = document.createElement('tr');
-        
-        // Name cell
-        const nameCell = document.createElement('td');
-        const nameDiv = document.createElement('div');
-        nameDiv.className = 'candidate-name-cell';
-        nameDiv.innerHTML = `
-            <i class="fas fa-file-alt" style="color: var(--primary); margin-right: 8px;"></i>
-            <span class="truncated-name" title="${candidate.name}">${candidate.name}</span>
-        `;
-        nameCell.appendChild(nameDiv);
-        row.appendChild(nameCell);
-        
-        // Fit % cell
-        const fitCell = document.createElement('td');
-        fitCell.innerHTML = `
-            <div class="fit-display">
-                <div class="fit-percentage" style="color: ${getFitColor(candidate.fit)}">
-                    ${candidate.fit}%
-                </div>
-                <div class="fit-bar">
-                    <div class="fit-progress" style="width: ${candidate.fit}%; background: ${getFitColor(candidate.fit)};"></div>
-                </div>
+function renderComparisonTable(candidates, targetContainer = resultsContent) {
+    const board = document.createElement('section');
+    board.className = 'candidate-comparison-board';
+
+    const header = document.createElement('div');
+    header.className = 'candidate-comparison-header comparison-grid';
+    header.innerHTML = `
+        <div>Resume</div>
+        <div>Match Score</div>
+        <div>Matched Skills</div>
+        <div>Missing Skills</div>
+        <div>Recommendations</div>
+    `;
+    board.appendChild(header);
+
+    (candidates || []).forEach(candidate => {
+        const row = document.createElement('article');
+        row.className = 'candidate-comparison-card comparison-grid';
+
+        const resumeCell = document.createElement('div');
+        resumeCell.className = 'comparison-cell resume-cell';
+        resumeCell.setAttribute('data-label', 'Resume');
+        resumeCell.innerHTML = `
+            <div class="resume-name-wrap">
+                <i class="fas fa-file-alt"></i>
+                <span class="resume-name" title="${escapeHtml(candidate.name || "Unknown Resume")}">${escapeHtml(candidate.name || "Unknown Resume")}</span>
             </div>
         `;
-        row.appendChild(fitCell);
-        
-        // Matched Skills cell
-        const matchedCell = document.createElement('td');
-        matchedCell.appendChild(createSkillCell(candidate.matched, 'matched', index));
+
+        const scoreCell = document.createElement('div');
+        scoreCell.className = 'comparison-cell score-cell';
+        scoreCell.setAttribute('data-label', 'Match Score');
+        scoreCell.innerHTML = `
+            <div class="score-value" style="color: ${getFitColor(candidate.fit || 0)}">${candidate.fit || 0}%</div>
+            <div class="score-track">
+                <span class="score-fill" style="width: ${Math.max(0, Math.min(100, candidate.fit || 0))}%; background: ${getFitColor(candidate.fit || 0)}"></span>
+            </div>
+        `;
+
+        const matchedCell = document.createElement('div');
+        matchedCell.className = 'comparison-cell';
+        matchedCell.setAttribute('data-label', 'Matched Skills');
+        matchedCell.appendChild(createSkillCell(candidate.matched, 'matched'));
+
+        const missingCell = document.createElement('div');
+        missingCell.className = 'comparison-cell';
+        missingCell.setAttribute('data-label', 'Missing Skills');
+        missingCell.appendChild(createSkillCell(candidate.missing, 'missing'));
+
+        const recommendationsCell = document.createElement('div');
+        recommendationsCell.className = 'comparison-cell';
+        recommendationsCell.setAttribute('data-label', 'Recommendations');
+        recommendationsCell.appendChild(createRecommendationsCell(candidate));
+
+        row.appendChild(resumeCell);
+        row.appendChild(scoreCell);
         row.appendChild(matchedCell);
-        
-        // Missing Skills cell
-        const missingCell = document.createElement('td');
-        missingCell.appendChild(createSkillCell(candidate.missing, 'missing', index));
         row.appendChild(missingCell);
-        
-        // Extra Skills cell
-        const extraCell = document.createElement('td');
-        extraCell.appendChild(createSkillCell(candidate.extras, 'extra', index));
-        row.appendChild(extraCell);
-        
-        tbody.appendChild(row);
+        row.appendChild(recommendationsCell);
+
+        board.appendChild(row);
     });
-    
-    table.appendChild(tbody);
-    tableContainer.appendChild(table);
-    resultsContent.appendChild(tableContainer);
+
+    targetContainer.appendChild(board);
 }
 
-function createSkillCell(skills, type, index) {
+function createSkillCell(skills, type) {
     const container = document.createElement('div');
-    container.className = 'scrollable-skills';
+    container.className = 'skill-chip-group';
     
-    if (skills.length === 0) {
+    if (!Array.isArray(skills) || skills.length === 0) {
         const emptyMsg = document.createElement('div');
-        emptyMsg.className = 'no-skills';
-        emptyMsg.textContent = 'None';
-        emptyMsg.style.cssText = 'color: var(--gray); font-style: italic;';
+        emptyMsg.className = 'comparison-empty-text';
+        emptyMsg.textContent = type === 'missing' ? 'No gaps detected' : 'No matched skills';
         container.appendChild(emptyMsg);
         return container;
     }
-    
-    const skillCount = document.createElement('div');
-    skillCount.className = 'skill-count';
-    skillCount.textContent = `${skills.length} skills`;
-    skillCount.style.cssText = 'font-size: 0.8rem; color: var(--gray); margin-bottom: 5px;';
-    container.appendChild(skillCount);
-    
-    skills.forEach((skill, skillIndex) => {
+
+    skills.forEach(skill => {
         const chip = document.createElement('span');
-        chip.className = `table-skill-chip ${type}`;
+        chip.className = `comparison-skill-chip ${type}`;
         chip.textContent = skill;
-        chip.title = skill; // Tooltip shows full text on hover
-        
-        // Add click to view details
+        chip.title = skill;
+
         chip.addEventListener('click', () => {
             showSkillDetails(skill, type);
         });
-        
+
         container.appendChild(chip);
     });
-    
+
     return container;
+}
+
+function createRecommendationsCell(candidate) {
+    const container = document.createElement('div');
+    container.className = 'recommendation-cell';
+
+    const recommendations = buildRecommendationInsights(candidate);
+    if (recommendations.length === 0) {
+        const emptyMsg = document.createElement('div');
+        emptyMsg.className = 'comparison-empty-text';
+        emptyMsg.textContent = 'No recommendations';
+        container.appendChild(emptyMsg);
+        return container;
+    }
+
+    const list = document.createElement('ul');
+    list.className = 'recommendation-list';
+    recommendations.slice(0, 3).forEach(rec => {
+        const li = document.createElement('li');
+        li.textContent = rec;
+        list.appendChild(li);
+    });
+    container.appendChild(list);
+
+    return container;
+}
+
+function buildRecommendationInsights(candidate) {
+    const backendRecommendations = Array.isArray(candidate.recommendations) ? candidate.recommendations : [];
+    const cleaned = backendRecommendations
+        .map(text => String(text || "").trim())
+        .filter(Boolean)
+        .filter(text => !/missing skills?:|matched skills?:|strength:|weakness:/i.test(text));
+
+    if (cleaned.length > 0) {
+        return cleaned.slice(0, 2);
+    }
+
+    const missingCount = (candidate.missing || []).length;
+    const fit = candidate.fit || 0;
+    if (fit >= 80) {
+        return ["Strong alignment with required technical stack.", "Ready for technical screening and role-fit interview."];
+    }
+    if (missingCount <= 1) {
+        return ["High potential match with minimal upskilling required.", "One targeted improvement area before final round."];
+    }
+    if (fit >= 55) {
+        return ["Moderate alignment with the role requirements.", "Focused upskilling plan recommended before shortlist decision."];
+    }
+    return ["Partial alignment with the role expectations.", "Significant upskilling recommended before proceeding."];
+}
+
+function getVerdictFromFit(fit) {
+    if (fit >= 75) return "Good Fit";
+    if (fit >= 50) return "Moderate";
+    return "Low Fit";
 }
 
 function getFitColor(fit) {
@@ -557,31 +963,18 @@ function copyToClipboard(text) {
 // ===== SORTING =====
 function sortResults() {
     if (!currentResults) return;
-    
-    const sortBy = sortSelect.value;
-    let sortedResults = [...currentResults.results];
-    
-    switch (sortBy) {
-        case "name":
-            sortedResults.sort((a, b) => a.name.localeCompare(b.name));
-            break;
-        case "skills":
-            sortedResults.sort((a, b) => b.matched.length - a.matched.length);
-            break;
-        case "fit":
-        default:
-            sortedResults.sort((a, b) => b.fit - a.fit);
-    }
-    
-    currentResults.results = sortedResults;
-    renderComparisonTable(sortedResults);
+    renderResults(currentResults);
 }
 
 // ===== DETAILED VIEW =====
 function showCandidateDetails(index) {
-    if (!currentResults || !currentResults.results[index]) return;
-    
-    const candidate = currentResults.results[index];
+    if (!currentResults) return;
+
+    const analyses = getJdAnalyses(currentResults);
+    const primaryResults = getSortedResults(analyses[0]?.results || []);
+    if (!primaryResults[index]) return;
+
+    const candidate = primaryResults[index];
     
     modalBody.innerHTML = `
         <div class="candidate-details">
@@ -662,24 +1055,30 @@ function showCandidateDetails(index) {
 }
 
 function getRecommendations(candidate) {
+    if (Array.isArray(candidate.recommendations) && candidate.recommendations.length > 0) {
+        return candidate.recommendations
+            .map(rec => `<p><i class="fas fa-arrow-right"></i> ${escapeHtml(rec)}</p>`)
+            .join('');
+    }
+
     let recommendations = [];
+    const fit = candidate.fit || 0;
+    const missingCount = (candidate.missing || []).length;
     
-    if (candidate.fit >= 90) {
-        recommendations.push("Excellent match! Strong candidate for interview.");
-    } else if (candidate.fit >= 70) {
-        recommendations.push("Good match. Consider for next round.");
-    } else if (candidate.fit >= 50) {
-        recommendations.push("Moderate match. Review missing skills carefully.");
+    if (fit >= 85) {
+        recommendations.push("Strong alignment with role requirements; proceed with technical validation.");
+    } else if (fit >= 65) {
+        recommendations.push("Good alignment overall; shortlist with targeted follow-up assessment.");
+    } else if (fit >= 45) {
+        recommendations.push("Moderate role fit; consider development plan before final decision.");
     } else {
-        recommendations.push("Low match. May not be suitable unless other qualifications are exceptional.");
+        recommendations.push("Limited alignment for this role; prioritize candidates with stronger fit.");
     }
     
-    if (candidate.missing.length > 0) {
-        recommendations.push(`Focus on developing: ${candidate.missing.slice(0, 3).join(', ')}`);
-    }
-    
-    if (candidate.extras.length > 0) {
-        recommendations.push(`Has additional valuable skills: ${candidate.extras.slice(0, 3).join(', ')}`);
+    if (missingCount <= 1 && fit >= 60) {
+        recommendations.push("Only one focused upskilling area identified.");
+    } else if (missingCount >= 3) {
+        recommendations.push("Multiple capability gaps suggest structured upskilling is needed.");
     }
     
     return recommendations.map(rec => `<p><i class="fas fa-arrow-right"></i> ${rec}</p>`).join('');
@@ -687,11 +1086,27 @@ function getRecommendations(candidate) {
 
 // ===== EXPORT FUNCTIONALITY =====
 // ===== EXPORT FUNCTIONS =====
+function getExportAnalyses() {
+    return getJdAnalyses(currentResults).map((analysis, index) => ({
+        jd_name: analysis.jd_name || `JD ${index + 1}`,
+        required_skills: analysis.required_skills || [],
+        statistics: analysis.statistics || {},
+        results: getSortedResults(analysis.results || [])
+    }));
+}
+
 function exportResults() {
     if (!currentResults) {
         showNotification("No results to export", "error");
         return;
     }
+
+    const analyses = getExportAnalyses();
+    const jdCount = analyses.length;
+    const totalRows = analyses.reduce((sum, analysis) => sum + analysis.results.length, 0);
+    const avgSkills = jdCount
+        ? Math.round(analyses.reduce((sum, analysis) => sum + analysis.required_skills.length, 0) / jdCount)
+        : 0;
 
     // Create export modal
     const exportModal = document.createElement('div');
@@ -705,11 +1120,18 @@ function exportResults() {
             <div class="modal-body">
                 <p style="margin-bottom: 20px; color: var(--dark);">Select export format:</p>
                 <div class="export-options">
+                    <button class="export-option-btn" onclick="exportToBIDataset('Power BI / Tableau')">
+                        <i class="fas fa-chart-area"></i>
+                        <div>
+                            <strong>BI Dataset (Recommended)</strong>
+                            <small>Flattened CSV for Power BI and Tableau dashboards</small>
+                        </div>
+                    </button>
                     <button class="export-option-btn" onclick="exportToCSV()">
                         <i class="fas fa-file-csv"></i>
                         <div>
                             <strong>CSV Format</strong>
-                            <small>Compatible with Excel, Google Sheets</small>
+                            <small>Compatible with Excel and Google Sheets</small>
                         </div>
                     </button>
                     <button class="export-option-btn" onclick="exportToExcel()">
@@ -729,7 +1151,7 @@ function exportResults() {
                 </div>
                 <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--gray-light);">
                     <div class="export-preview">
-                        <p><i class="fas fa-info-circle"></i> <strong>Preview:</strong> ${currentResults.results.length} candidates, ${currentResults.required_skills.length} skills detected</p>
+                        <p><i class="fas fa-info-circle"></i> <strong>Preview:</strong> ${jdCount} JD result set(s), ${totalRows} candidate row(s), ${avgSkills} avg required skills</p>
                     </div>
                 </div>
             </div>
@@ -787,14 +1209,129 @@ function exportResults() {
     exportModal.style.display = 'flex';
 }
 
+function exportToBIDataset(platformName = "BI Tool") {
+    if (!currentResults) return;
+
+    const rows = buildBIRows(getExportAnalyses());
+    const csvContent = rowsToCSV(rows);
+    const dateKey = new Date().toISOString().split("T")[0];
+    const platformKey = platformName.toLowerCase().includes("tableau") ? "tableau" :
+        platformName.toLowerCase().includes("power") ? "powerbi" : "bi";
+    const filename = `job-analysis-${platformKey}-${dateKey}.csv`;
+
+    downloadFile(csvContent, filename, "text/csv;charset=utf-8");
+    showNotification(`Dashboard dataset exported for ${platformName}`, "success");
+    document.querySelector('.modal')?.remove();
+}
+
+function buildBIRows(analyses = []) {
+    const analysisDate = new Date().toISOString();
+
+    return analyses.flatMap((analysis, jdIndex) => {
+        const requiredSkills = (analysis.required_skills || []).map(skill => (skill || "").trim()).filter(Boolean);
+        const requiredSet = new Set(requiredSkills.map(skill => skill.toLowerCase()));
+
+        return (analysis.results || []).flatMap((candidate, candidateIndex) => {
+            const matched = (candidate.matched || []).map(skill => (skill || "").trim()).filter(Boolean);
+            const missing = (candidate.missing || []).map(skill => (skill || "").trim()).filter(Boolean);
+            const extras = (candidate.extras || []).map(skill => (skill || "").trim()).filter(Boolean);
+
+            const matchedSet = new Set(matched.map(skill => skill.toLowerCase()));
+            const missingSet = new Set(missing.map(skill => skill.toLowerCase()));
+            const extrasSet = new Set(extras.map(skill => skill.toLowerCase()));
+
+            const skillNames = Array.from(new Set([...requiredSkills, ...matched, ...missing, ...extras]));
+            if (skillNames.length === 0) {
+                return [{
+                    analysis_date: analysisDate,
+                    jd_index: jdIndex + 1,
+                    jd_name: analysis.jd_name || `JD ${jdIndex + 1}`,
+                    candidate_name: candidate.name || "Unknown Candidate",
+                    candidate_rank: candidateIndex + 1,
+                    fit_score: candidate.fit ?? 0,
+                    matched_count: candidate.matched_count ?? matched.length,
+                    missing_count: candidate.missing_count ?? missing.length,
+                    extra_count: candidate.extra_count ?? extras.length,
+                    required_skills_count: requiredSkills.length,
+                    skill_name: "",
+                    skill_status: "None",
+                    is_required: 0,
+                    is_matched: 0,
+                    is_missing: 0,
+                    is_extra: 0
+                }];
+            }
+
+            return skillNames.map(skillName => {
+                const normalized = skillName.toLowerCase();
+                const isRequired = requiredSet.has(normalized) ? 1 : 0;
+                const isMatched = matchedSet.has(normalized) ? 1 : 0;
+                const isMissing = missingSet.has(normalized) ? 1 : 0;
+                const isExtra = extrasSet.has(normalized) ? 1 : 0;
+
+                let skillStatus = "Related";
+                if (isMatched) {
+                    skillStatus = "Matched";
+                } else if (isMissing) {
+                    skillStatus = "Missing";
+                } else if (isExtra) {
+                    skillStatus = "Extra";
+                } else if (isRequired) {
+                    skillStatus = "Required";
+                }
+
+                return {
+                    analysis_date: analysisDate,
+                    jd_index: jdIndex + 1,
+                    jd_name: analysis.jd_name || `JD ${jdIndex + 1}`,
+                    candidate_name: candidate.name || "Unknown Candidate",
+                    candidate_rank: candidateIndex + 1,
+                    fit_score: candidate.fit ?? 0,
+                    matched_count: candidate.matched_count ?? matched.length,
+                    missing_count: candidate.missing_count ?? missing.length,
+                    extra_count: candidate.extra_count ?? extras.length,
+                    required_skills_count: requiredSkills.length,
+                    skill_name: skillName,
+                    skill_status: skillStatus,
+                    is_required: isRequired,
+                    is_matched: isMatched,
+                    is_missing: isMissing,
+                    is_extra: isExtra
+                };
+            });
+        });
+    });
+}
+
+function rowsToCSV(rows) {
+    if (!rows || rows.length === 0) return "";
+
+    const headers = Object.keys(rows[0]);
+    const csvRows = [headers.join(",")];
+
+    rows.forEach(row => {
+        const line = headers.map(header => escapeCsvValue(row[header])).join(",");
+        csvRows.push(line);
+    });
+
+    return csvRows.join("\n");
+}
+
+function escapeCsvValue(value) {
+    if (value === null || value === undefined) return "";
+    const valueString = String(value);
+    if (/[",\n]/.test(valueString)) {
+        return `"${valueString.replace(/"/g, '""')}"`;
+    }
+    return valueString;
+}
+
 function exportToCSV() {
     if (!currentResults) return;
-    
-    const data = currentResults;
-    let csvContent = "data:text/csv;charset=utf-8,";
-    
-    // Add headers
+
+    const analyses = getExportAnalyses();
     const headers = [
+        "JD Name",
         "Candidate Name",
         "Fit Score (%)",
         "Matched Skills Count",
@@ -803,42 +1340,36 @@ function exportToCSV() {
         "Matched Skills",
         "Missing Skills",
         "Extra Skills",
-        "Required Skills"
+        "Required Skills",
+        "Recommendations",
+        "Final Verdict"
     ];
-    
-    csvContent += headers.join(",") + "\n";
-    
-    // Add data rows
-    data.results.forEach(candidate => {
-        const row = [
-            `"${candidate.name}"`,
-            candidate.fit,
-            candidate.matched_count,
-            candidate.missing_count,
-            candidate.extra_count,
-            `"${candidate.matched.join(", ")}"`,
-            `"${candidate.missing.join(", ")}"`,
-            `"${candidate.extras.join(", ")}"`,
-            `"${data.required_skills.join(", ")}"`
-        ];
-        csvContent += row.join(",") + "\n";
+
+    const lines = [headers.join(",")];
+
+    analyses.forEach(analysis => {
+        (analysis.results || []).forEach(candidate => {
+            const row = [
+                analysis.jd_name || "",
+                candidate.name || "",
+                candidate.fit ?? 0,
+                candidate.matched_count ?? (candidate.matched || []).length,
+                candidate.missing_count ?? (candidate.missing || []).length,
+                candidate.extra_count ?? (candidate.extras || []).length,
+                (candidate.matched || []).join(", "),
+                (candidate.missing || []).join(", "),
+                (candidate.extras || []).join(", "),
+                (analysis.required_skills || []).join(", "),
+                (candidate.recommendations || []).join(" | "),
+                candidate.verdict_label || candidate.verdict || getVerdictFromFit(candidate.fit)
+            ];
+            lines.push(row.map(escapeCsvValue).join(","));
+        });
     });
-    
-    // Add summary row
-    csvContent += "\nSUMMARY\n";
-    csvContent += `Total Candidates,${data.results.length}\n`;
-    csvContent += `Average Fit Score,${Math.round(data.results.reduce((sum, r) => sum + r.fit, 0) / data.results.length)}%\n`;
-    csvContent += `Required Skills,"${data.required_skills.join(", ")}"\n`;
-    csvContent += `Analysis Date,${new Date().toLocaleDateString()}\n`;
-    
-    // Create and trigger download
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `job-analysis-${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+    const csvContent = lines.join("\n");
+    const filename = `job-analysis-${new Date().toISOString().split('T')[0]}.csv`;
+    downloadFile(csvContent, filename, "text/csv;charset=utf-8");
     
     showNotification("Results exported as CSV", "success");
     document.querySelector('.modal')?.remove();
@@ -848,60 +1379,54 @@ function exportToExcel() {
     if (!currentResults) return;
     
     try {
-        const data = currentResults;
+        const analyses = getExportAnalyses();
         
         // Create workbook
         const wb = XLSX.utils.book_new();
         wb.Props = {
-            Title: "AI Job Analyzer Results",
+            Title: "InterSyncIQ Results",
             Subject: "Candidate Analysis",
-            Author: "AI Job Analyzer",
+            Author: "InterSyncIQ",
             CreatedDate: new Date()
         };
         
-        // Sheet 1: Candidate Analysis
-        const candidateData = data.results.map(candidate => ({
-            "Candidate Name": candidate.name,
-            "Fit Score (%)": candidate.fit,
-            "Matched Skills Count": candidate.matched_count,
-            "Missing Skills Count": candidate.missing_count,
-            "Extra Skills Count": candidate.extra_count,
-            "Matched Skills": candidate.matched.join(", "),
-            "Missing Skills": candidate.missing.join(", "),
-            "Extra Skills": candidate.extras.join(", ")
-        }));
-        
-        const ws1 = XLSX.utils.json_to_sheet(candidateData);
-        
-        // Add header style
-        const headerRange = XLSX.utils.decode_range(ws1['!ref']);
-        for (let C = headerRange.s.c; C <= headerRange.e.c; ++C) {
-            const address = XLSX.utils.encode_col(C) + "1";
-            if (!ws1[address]) continue;
-            ws1[address].s = {
-                fill: { fgColor: { rgb: "4361EE" } },
-                font: { color: { rgb: "FFFFFF" }, bold: true },
-                alignment: { horizontal: "center" }
-            };
+        const candidateData = analyses.flatMap(analysis =>
+            (analysis.results || []).map(candidate => ({
+                "JD Name": analysis.jd_name,
+                "Candidate Name": candidate.name || "",
+                "Fit Score (%)": candidate.fit ?? 0,
+                "Matched Skills Count": candidate.matched_count ?? (candidate.matched || []).length,
+                "Missing Skills Count": candidate.missing_count ?? (candidate.missing || []).length,
+                "Extra Skills Count": candidate.extra_count ?? (candidate.extras || []).length,
+                "Matched Skills": (candidate.matched || []).join(", "),
+                "Missing Skills": (candidate.missing || []).join(", "),
+                "Extra Skills": (candidate.extras || []).join(", "),
+                "Required Skills": (analysis.required_skills || []).join(", "),
+                "Recommendations": (candidate.recommendations || []).join(" | "),
+                "Final Verdict": candidate.verdict_label || candidate.verdict || getVerdictFromFit(candidate.fit)
+            }))
+        );
+
+        if (candidateData.length === 0) {
+            candidateData.push({
+                "JD Name": "",
+                "Candidate Name": "",
+                "Fit Score (%)": 0,
+                "Matched Skills Count": 0,
+                "Missing Skills Count": 0,
+                "Extra Skills Count": 0,
+                "Matched Skills": "",
+                "Missing Skills": "",
+                "Extra Skills": "",
+                "Required Skills": "",
+                "Recommendations": "",
+                "Final Verdict": ""
+            });
         }
         
-        // Add conditional formatting for fit scores
-        data.results.forEach((candidate, index) => {
-            const cell = "B" + (index + 2); // Fit score column
-            if (!ws1[cell]) return;
-            
-            let color = "FF6B6B"; // Red for low scores
-            if (candidate.fit >= 80) color = "4CAF50"; // Green for high scores
-            else if (candidate.fit >= 60) color = "FF9800"; // Orange for medium scores
-            
-            ws1[cell].s = {
-                fill: { fgColor: { rgb: color } },
-                font: { color: { rgb: "FFFFFF" }, bold: true },
-                numFmt: "0%"
-            };
-        });
-        
+        const ws1 = XLSX.utils.json_to_sheet(candidateData);
         ws1["!cols"] = [
+            { wch: 24 }, // JD Name
             { wch: 30 }, // Candidate Name
             { wch: 15 }, // Fit Score
             { wch: 20 }, // Matched Skills Count
@@ -909,58 +1434,62 @@ function exportToExcel() {
             { wch: 20 }, // Extra Skills Count
             { wch: 40 }, // Matched Skills
             { wch: 40 }, // Missing Skills
-            { wch: 40 }  // Extra Skills
+            { wch: 40 }, // Extra Skills
+            { wch: 45 }, // Required Skills
+            { wch: 50 }, // Recommendations
+            { wch: 18 }  // Final Verdict
         ];
         
         XLSX.utils.book_append_sheet(wb, ws1, "Candidate Analysis");
         
-        // Sheet 2: Skills Summary
-        const skillsData = [
-            ["Required Skills"],
-            ...data.required_skills.map(skill => [skill])
-        ];
+        const skillsData = [["JD Name", "Required Skill"]];
+        analyses.forEach(analysis => {
+            const skills = analysis.required_skills || [];
+            if (skills.length === 0) {
+                skillsData.push([analysis.jd_name, ""]);
+                return;
+            }
+            skills.forEach(skill => skillsData.push([analysis.jd_name, skill]));
+        });
         
         const ws2 = XLSX.utils.aoa_to_sheet(skillsData);
-        ws2["!cols"] = [{ wch: 30 }];
-        
-        // Style skills sheet
-        const skillsHeader = ws2["A1"];
-        if (skillsHeader) {
-            skillsHeader.s = {
-                fill: { fgColor: { rgb: "7209B7" } },
-                font: { color: { rgb: "FFFFFF" }, bold: true }
-            };
-        }
+        ws2["!cols"] = [{ wch: 24 }, { wch: 40 }];
         
         XLSX.utils.book_append_sheet(wb, ws2, "Skills Summary");
         
-        // Sheet 3: Statistics
-        const statsData = [
-            ["Metric", "Value"],
-            ["Total Candidates", data.results.length],
-            ["Average Fit Score", Math.round(data.results.reduce((sum, r) => sum + r.fit, 0) / data.results.length) + "%"],
-            ["Highest Score", Math.max(...data.results.map(r => r.fit)) + "%"],
-            ["Lowest Score", Math.min(...data.results.map(r => r.fit)) + "%"],
-            ["Required Skills Count", data.required_skills.length],
-            ["Analysis Date", new Date().toLocaleDateString()]
-        ];
+        const statsData = [["JD Name", "Candidates", "Average Fit", "Top Fit", "Skills Detected"]];
+        analyses.forEach(analysis => {
+            const stats = analysis.statistics || {};
+            statsData.push([
+                analysis.jd_name,
+                stats.total_candidates ?? (analysis.results || []).length,
+                `${stats.average_fit ?? 0}%`,
+                `${stats.top_fit ?? 0}%`,
+                stats.skills_detected ?? (analysis.required_skills || []).length
+            ]);
+        });
+
+        const totalCandidates = analyses.reduce((sum, analysis) => sum + (analysis.results || []).length, 0);
+        const weightedFitNumerator = analyses.reduce((sum, analysis) => {
+            const stats = analysis.statistics || {};
+            const candidates = stats.total_candidates ?? (analysis.results || []).length;
+            const avgFit = stats.average_fit ?? 0;
+            return sum + (avgFit * candidates);
+        }, 0);
+        const overallAvgFit = totalCandidates ? Math.round(weightedFitNumerator / totalCandidates) : 0;
+        const overallTopFit = analyses.reduce((maxValue, analysis) => {
+            const topFit = analysis.statistics?.top_fit ?? 0;
+            return Math.max(maxValue, topFit);
+        }, 0);
+        const avgSkillsDetected = analyses.length
+            ? Math.round(analyses.reduce((sum, analysis) => sum + (analysis.required_skills || []).length, 0) / analyses.length)
+            : 0;
+
+        statsData.push([]);
+        statsData.push(["Overall", totalCandidates, `${overallAvgFit}%`, `${overallTopFit}%`, avgSkillsDetected]);
         
         const ws3 = XLSX.utils.aoa_to_sheet(statsData);
-        ws3["!cols"] = [{ wch: 25 }, { wch: 20 }];
-        
-        // Style stats sheet
-        const statsRange = XLSX.utils.decode_range(ws3['!ref']);
-        for (let R = statsRange.s.r; R <= statsRange.e.r; ++R) {
-            for (let C = statsRange.s.c; C <= statsRange.e.c; ++C) {
-                const address = XLSX.utils.encode_cell({ r: R, c: C });
-                if (R === 0) { // Header row
-                    ws3[address].s = {
-                        fill: { fgColor: { rgb: "4CC9F0" } },
-                        font: { color: { rgb: "FFFFFF" }, bold: true }
-                    };
-                }
-            }
-        }
+        ws3["!cols"] = [{ wch: 24 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }];
         
         XLSX.utils.book_append_sheet(wb, ws3, "Statistics");
         
@@ -1003,14 +1532,15 @@ function downloadFile(content, filename, type) {
 async function analyzeCandidate() {
     const resumeFile = candidateResumeInput.files[0];
     const jdText = candidateJDText.value.trim();
+    const jdFiles = Array.from(candidateJDFileInput.files || []);
     
     if (!resumeFile) {
         showNotification("Please upload your resume", "error");
         return;
     }
     
-    if (!jdText) {
-        showNotification("Please enter a job description", "error");
+    if (!jdText && jdFiles.length === 0) {
+        showNotification("Please provide at least one job description", "error");
         return;
     }
     
@@ -1020,8 +1550,25 @@ async function analyzeCandidate() {
     
     try {
         const formData = new FormData();
+        const validTypes = [".pdf", ".docx", ".txt"];
+
         formData.append("candidate_resume", resumeFile);
-        formData.append("jd_text", jdText);
+        if (jdText) {
+            formData.append("jd_text", jdText);
+        }
+
+        for (const jdFile of jdFiles) {
+            const fileExt = "." + jdFile.name.split('.').pop().toLowerCase();
+            if (!validTypes.includes(fileExt)) {
+                showNotification(`JD file type not supported: ${fileExt}`, "error");
+                return;
+            }
+            if (jdFile.size > 10 * 1024 * 1024) {
+                showNotification(`JD file "${jdFile.name}" is too large (max 10MB)`, "error");
+                return;
+            }
+            formData.append("candidate_jd_file", jdFile);
+        }
         
         const response = await fetch("/analyze-candidate", {
             method: "POST",
@@ -1040,9 +1587,16 @@ async function analyzeCandidate() {
         
         // Show results section
         candidateResults.style.display = "block";
+        updateRecruiterCompactMode();
         candidateResults.scrollIntoView({ behavior: "smooth" });
-        
-        showNotification("Analysis complete! Check your results below.", "success");
+
+        const jdCount = getCandidateJDAnalyses(data).length;
+        showNotification(
+            jdCount > 1
+                ? "Select Job Description to view your eligibility"
+                : "Analysis complete! Check your results below.",
+            "success"
+        );
         
     } catch (error) {
         console.error("Candidate analysis error:", error);
@@ -1054,29 +1608,68 @@ async function analyzeCandidate() {
 }
 
 function renderCandidateResults(data) {
+    const analyses = getCandidateJDAnalyses(data);
+    if (selectedCandidateJDIndex < 0 || selectedCandidateJDIndex >= analyses.length) {
+        selectedCandidateJDIndex = 0;
+    }
+
+    if (analyses.length > 1) {
+        candidateJDSelectorWrap.style.display = "block";
+        candidateJDSelect.innerHTML = analyses
+            .map((analysis, index) => `<option value="${index}" ${index === selectedCandidateJDIndex ? "selected" : ""}>${escapeHtml(analysis.jd_name || `JD ${index + 1}`)}</option>`)
+            .join("");
+
+        candidateJDSelect.onchange = (event) => {
+            selectedCandidateJDIndex = Number(event.target.value) || 0;
+            renderCandidateResults(candidateAnalysis);
+        };
+    } else {
+        candidateJDSelectorWrap.style.display = "none";
+        candidateJDSelect.innerHTML = "";
+    }
+
+    const activeAnalysis = analyses[selectedCandidateJDIndex] || analyses[0];
+
     // Update fit score
-    const fitScore = data.fit_score;
+    const fitScore = activeAnalysis.fit_score;
     candidateFitScore.textContent = `${fitScore}%`;
-    fitFeedback.textContent = getFitFeedback(fitScore);
+    fitFeedback.textContent = getFitFeedback(fitScore, activeAnalysis.skills?.missing?.length || 0);
     
     // Update progress circle
     const progress = (fitScore / 100) * 360;
     candidateFitCircle.style.background = `conic-gradient(var(--primary) ${progress}deg, var(--gray-light) 0deg)`;
     
     // Render skills
-    renderCandidateSkills(data.skills.matched, candidateMatched, "matched");
-    renderCandidateSkills(data.skills.missing, candidateMissing, "missing");
-    renderCandidateSkills(data.skills.extras, candidateExtra, "extra");
+    renderCandidateSkills(activeAnalysis.skills.matched, candidateMatched, "matched");
+    renderCandidateSkills(activeAnalysis.skills.missing, candidateMissing, "missing");
     
     // Generate recommendations
-    generateRecommendations(data);
-    generateActionPlan(data);
+    generateRecommendations(activeAnalysis);
+    generateActionPlan(activeAnalysis);
+}
+
+function getCandidateJDAnalyses(data) {
+    if (Array.isArray(data?.candidate_jd_analyses) && data.candidate_jd_analyses.length > 0) {
+        return data.candidate_jd_analyses;
+    }
+
+    return [{
+        jd_name: "Job Description",
+        fit_score: data?.fit_score || 0,
+        skills: data?.skills || { matched: [], missing: [], extras: [] },
+        skill_gaps: data?.skill_gaps || [],
+        suggestions: data?.suggestions || [],
+        alternative_roles: data?.alternative_roles || [],
+        learning_path: data?.learning_path || [],
+        summary: data?.summary || {}
+    }];
 }
 
 function renderCandidateSkills(skills, container, type) {
+    const safeSkills = Array.isArray(skills) ? skills : [];
     container.innerHTML = "";
     
-    if (skills.length === 0) {
+    if (safeSkills.length === 0) {
         const emptyMsg = document.createElement('div');
         emptyMsg.className = 'no-skills';
         emptyMsg.textContent = type === 'matched' ? 'No matching skills found' : 
@@ -1086,7 +1679,7 @@ function renderCandidateSkills(skills, container, type) {
         return;
     }
     
-    skills.forEach(skill => {
+    safeSkills.forEach(skill => {
         const chip = document.createElement('span');
         chip.className = `skill-tag ${type}`;
         chip.textContent = skill.charAt(0).toUpperCase() + skill.slice(1);
@@ -1096,64 +1689,24 @@ function renderCandidateSkills(skills, container, type) {
     });
 }
 
-function getFitFeedback(fitScore) {
-    if (fitScore >= 90) {
-        return "Excellent match! You're highly qualified for this position.";
-    } else if (fitScore >= 75) {
-        return "Strong candidate! You meet most requirements.";
-    } else if (fitScore >= 60) {
-        return "Good potential. Focus on developing missing skills.";
-    } else if (fitScore >= 40) {
-        return "Moderate match. Consider additional training.";
-    } else {
-        return "Consider other roles or significant skill development.";
-    }
+function getFitFeedback(fitScore, missingCount = 0) {
+    const band = fitScore >= 75 ? "Strong fit" : fitScore >= 50 ? "Moderate fit" : "Low fit";
+    const gapLabel = missingCount === 0
+        ? "no critical skill gaps identified"
+        : `${missingCount} critical skill gap${missingCount > 1 ? "s" : ""} identified`;
+    return `${band} — ${gapLabel}`;
 }
 
 function generateRecommendations(data) {
-    const fitScore = data.fit_score;
-    const missingSkills = data.skills.missing;
-    const extraSkills = data.skills.extras;
-    
-    // Learning Path
-    learningPath.innerHTML = `
-        <p>Based on your missing skills, here's your learning path:</p>
-        <ul>
-            ${missingSkills.slice(0, 3).map(skill => `
-                <li>
-                    <strong>${skill.toUpperCase()}:</strong> 
-                    ${getLearningResource(skill)}
-                </li>
-            `).join('')}
-        </ul>
-        <p><em>Estimated time: 2-4 weeks per skill</em></p>
-    `;
-    
-    // Alternative Roles
-    const roles = suggestAlternativeRoles(data);
-    alternativeRoles.innerHTML = `
-        <p>With your current skills, consider these roles:</p>
-        <ul>
-            ${roles.map(role => `
-                <li>
-                    <strong>${role.title}:</strong> 
-                    ${role.match}% match
-                    <br><small>${role.description}</small>
-                </li>
-            `).join('')}
-        </ul>
-    `;
-    
-    // Improvement Tips
-    improvementTips.innerHTML = `
-        <p>Quick wins to improve your profile:</p>
-        <ul>
-            <li><strong>Update Resume:</strong> Highlight ${data.skills.matched.slice(0, 2).join(', ')}</li>
-            <li><strong>Portfolio:</strong> Create 1-2 projects using ${missingSkills[0] || 'key skills'}</li>
-            <li><strong>Networking:</strong> Connect with professionals in target role</li>
-            <li><strong>Certifications:</strong> Consider ${getCertificationSuggestions(missingSkills)}</li>
-        </ul>
-    `;
+    const insights = buildKeyInsights(data);
+    renderCompactList(candidateInsights, insights, "No insights available yet.");
+
+    const actions = buildPrioritizedActions(data);
+    renderCompactList(candidateActionHigh, actions.high, "No immediate blockers.");
+    renderCompactList(candidateActionMedium, actions.medium, "No medium-priority actions.");
+    renderCompactList(candidateActionOptional, actions.optional, "No optional improvements.");
+
+    renderAlternativeRoleCards(data);
 }
 
 function suggestAlternativeRoles(data) {
@@ -1202,68 +1755,122 @@ function suggestAlternativeRoles(data) {
     return suggestedRoles.sort((a, b) => b.match - a.match).slice(0, 3);
 }
 
-function getLearningResource(skill) {
-    const resources = {
-        "python": "Python for Everybody (Coursera) - Free course",
-        "sql": "SQL Bootcamp (Udemy) - Hands-on practice",
-        "aws": "AWS Certified Solutions Architect - Official training",
-        "machine learning": "Machine Learning by Andrew Ng (Coursera)",
-        "react": "React - The Complete Guide (Udemy)",
-        "tableau": "Tableau Training (LinkedIn Learning)",
-        "excel": "Excel Advanced Skills (YouTube tutorials)",
-        "communication": "Effective Communication (Coursera)"
-    };
-    
-    return resources[skill.toLowerCase()] || "Online courses and practice projects";
+function buildKeyInsights(data) {
+    const matchedCount = data.skills?.matched?.length || 0;
+    const missingCount = data.skills?.missing?.length || 0;
+    const extraCount = data.skills?.extras?.length || 0;
+    const fitScore = data.fit_score || 0;
+    const insights = [];
+
+    if (fitScore >= 75) {
+        insights.push("Strong alignment with the role's core requirements.");
+    } else if (fitScore >= 50) {
+        insights.push("Baseline alignment exists with a few important gaps.");
+    } else {
+        insights.push("Current profile only partially aligns with role expectations.");
+    }
+
+    if (missingCount === 0) {
+        insights.push("No critical skill gaps detected for this JD.");
+    } else if (missingCount === 1) {
+        insights.push("One critical skill gap is limiting overall fit.");
+    } else {
+        insights.push(`${missingCount} critical skill gaps are reducing match quality.`);
+    }
+
+    if (matchedCount >= 3) {
+        insights.push("Strong foundation across key technical capabilities.");
+    } else if (matchedCount > 0) {
+        insights.push("Some relevant strengths are already in place.");
+    }
+
+    if (extraCount > 0) {
+        insights.push("Additional cross-domain skills improve flexibility for adjacent roles.");
+    }
+
+    return insights.slice(0, 4);
 }
 
-function getCertificationSuggestions(missingSkills) {
-    const certifications = {
-        "aws": "AWS Certified Solutions Architect",
-        "python": "Python Institute PCAP",
-        "sql": "Microsoft SQL Server Certification",
-        "machine learning": "Google Machine Learning Certification",
-        "project management": "PMP or CAPM"
+function buildPrioritizedActions(data) {
+    const missing = data.skills?.missing || [];
+    const matched = data.skills?.matched || [];
+
+    const high = [];
+    if (missing.length > 0) {
+        high.push(`Learn ${toTitleCase(missing[0])} to close the top gap.`);
+    }
+    if (missing.length > 1) {
+        high.push(`Strengthen ${toTitleCase(missing[1])} through guided practice.`);
+    }
+    if (high.length === 0) {
+        high.push("Maintain readiness by revising interview-relevant fundamentals.");
+    }
+
+    const medium = [
+        "Build one project aligned with this JD to prove practical ability.",
+        "Optimize resume bullets with measurable outcomes for relevant work."
+    ];
+    if (matched.length > 0) {
+        medium[1] = `Highlight ${toTitleCase(matched[0])} impact with quantified outcomes.`;
+    }
+
+    const optional = [
+        "Add one role-relevant certification or short credential.",
+        "Expand networking with targeted hiring communities."
+    ];
+
+    return {
+        high: high.slice(0, 2),
+        medium: medium.slice(0, 2),
+        optional: optional.slice(0, 2)
     };
-    
-    const suggestions = missingSkills
-        .filter(skill => certifications[skill.toLowerCase()])
-        .slice(0, 2)
-        .map(skill => certifications[skill.toLowerCase()]);
-    
-    return suggestions.length > 0 ? suggestions.join(' or ') : "relevant industry certifications";
+}
+
+function renderCompactList(target, items, emptyMessage) {
+    if (!target) return;
+    const safeItems = Array.isArray(items) ? items.filter(Boolean) : [];
+    if (safeItems.length === 0) {
+        target.innerHTML = `<li class="compact-empty">${escapeHtml(emptyMessage)}</li>`;
+        return;
+    }
+
+    target.innerHTML = safeItems
+        .map(item => `<li>${escapeHtml(item)}</li>`)
+        .join('');
+}
+
+function renderAlternativeRoleCards(data) {
+    if (!alternativeRoles) return;
+    const roles = suggestAlternativeRoles(data).slice(0, 3);
+    if (roles.length === 0) {
+        alternativeRoles.innerHTML = `<div class="compact-empty role-empty">No close alternative roles detected yet.</div>`;
+        return;
+    }
+
+    alternativeRoles.innerHTML = roles.map(role => `
+        <article class="role-mini-card">
+            <div class="role-mini-top">
+                <h4>${escapeHtml(role.title)}</h4>
+                <span>${role.match}%</span>
+            </div>
+            <p>${escapeHtml(role.description)}</p>
+        </article>
+    `).join('');
 }
 
 function generateActionPlan(data) {
-    const steps = [
-        {
-            title: "Immediate Action (Week 1)",
-            content: `Update your resume to highlight: ${data.skills.matched.slice(0, 3).join(', ')}`
-        },
-        {
-            title: "Skill Development (Week 2-3)",
-            content: `Start learning: ${data.skills.missing.slice(0, 2).join(' and ')} through online courses`
-        },
-        {
-            title: "Practical Application (Week 4)",
-            content: `Build a small project using ${data.skills.missing[0] || 'a key skill'} to demonstrate capability`
-        },
-        {
-            title: "Networking & Application (Week 5-6)",
-            content: "Connect with 10 professionals in your target role and apply to 5 relevant positions"
-        },
-        {
-            title: "Interview Preparation (Week 7-8)",
-            content: "Prepare STAR method answers for common interview questions and practice mock interviews"
-        }
+    const missing = data.skills?.missing || [];
+    const firstGap = missing[0] ? toTitleCase(missing[0]) : "the top missing skill";
+
+    const lines = [
+        `Week 1–2: Learn ${firstGap} fundamentals with focused practice.`,
+        "Week 3–4: Build one JD-aligned project for portfolio proof.",
+        "Week 5: Apply to targeted roles and schedule networking outreach."
     ];
-    
-    actionPlan.innerHTML = steps.map((step, index) => `
-        <div class="plan-step">
-            <h4>${step.title}</h4>
-            <p>${step.content}</p>
-        </div>
-    `).join('');
+
+    actionPlan.innerHTML = lines
+        .map(line => `<div class="quick-plan-line">${escapeHtml(line)}</div>`)
+        .join('');
 }
 
 function exportActionPlan() {
@@ -1271,29 +1878,36 @@ function exportActionPlan() {
         showNotification("No analysis to export", "error");
         return;
     }
+
+    const analyses = getCandidateJDAnalyses(candidateAnalysis);
+    const activeAnalysis = analyses[selectedCandidateJDIndex] || analyses[0];
+    const activeJDName = activeAnalysis.jd_name || "Selected Job Description";
     
     const planContent = `
-AI Job Analyzer - Personal Action Plan
+InterSyncIQ - Personal Action Plan
 Generated: ${new Date().toLocaleDateString()}
 ========================================
+Target JD: ${activeJDName}
 
 OVERVIEW:
-Fit Score: ${candidateAnalysis.fit_score}%
-Matched Skills: ${candidateAnalysis.skills.matched.length}
-Missing Skills: ${candidateAnalysis.skills.missing.length}
-Extra Skills: ${candidateAnalysis.skills.extras.length}
+Fit Score: ${activeAnalysis.fit_score}%
+Matched Skills: ${activeAnalysis.skills.matched.length}
+Missing Skills: ${activeAnalysis.skills.missing.length}
+Extra Skills: ${activeAnalysis.skills.extras.length}
 
-30-DAY ACTION PLAN:
-${actionPlan.textContent.replace(/\n/g, '\n')}
+KEY INSIGHTS:
+${candidateInsights.textContent.replace(/\n/g, '\n')}
 
-RECOMMENDATIONS:
-${learningPath.textContent.replace(/\n/g, '\n')}
+RECOMMENDED ACTIONS:
+High Priority: ${candidateActionHigh.textContent.replace(/\n/g, ' ').trim()}
+Medium Priority: ${candidateActionMedium.textContent.replace(/\n/g, ' ').trim()}
+Optional: ${candidateActionOptional.textContent.replace(/\n/g, ' ').trim()}
 
 ALTERNATIVE ROLES:
 ${alternativeRoles.textContent.replace(/\n/g, '\n')}
 
-IMPROVEMENT TIPS:
-${improvementTips.textContent.replace(/\n/g, '\n')}
+QUICK ACTION PLAN:
+${actionPlan.textContent.replace(/\n/g, '\n')}
     `;
     
     const blob = new Blob([planContent], { type: 'text/plain' });
@@ -1371,3 +1985,4 @@ notificationStyles.textContent = `
     }
 `;
 document.head.appendChild(notificationStyles);
+

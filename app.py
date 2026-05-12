@@ -74,6 +74,244 @@ CAREER_ROLES = {
     }
 }
 
+TOOL_CATEGORIES = ["programming", "data_science", "databases", "cloud", "web", "analytics", "business"]
+TOOL_KEYWORDS = sorted({
+    skill
+    for category in TOOL_CATEGORIES
+    for skill in SKILL_DATABASE.get(category, [])
+})
+
+KEYWORD_STOPWORDS = {
+    "and", "the", "for", "with", "from", "that", "this", "your", "will", "have",
+    "has", "our", "you", "are", "who", "all", "any", "job", "role", "team",
+    "work", "working", "using", "required", "requirements", "responsibilities",
+    "responsibility", "experience", "years", "year", "plus", "ability", "skills",
+    "knowledge", "strong", "good", "excellent", "preferred", "must", "should",
+    "candidate", "position", "including", "across", "into", "their", "they",
+    "them", "through", "about", "what", "when", "where", "how", "need", "etc"
+}
+
+EXPERIENCE_PATTERN = re.compile(r"\b(\d{1,2})\s*\+?\s*(?:years?|yrs?)\b", re.IGNORECASE)
+
+
+def _skill_in_text(skill: str, text: str) -> bool:
+    """Boundary-aware skill matching."""
+    if not skill:
+        return False
+    pattern = r"(?<!\w)" + re.escape(skill.lower()) + r"(?!\w)"
+    return re.search(pattern, text, re.IGNORECASE) is not None
+
+
+def detect_skills_in_text(text: str, use_fallback: bool = False) -> List[str]:
+    """Detect skills in free text."""
+    text = (text or "").lower()
+    detected_skills = set()
+
+    for skill, pattern in SKILL_PATTERNS.items():
+        if re.search(pattern, text, re.IGNORECASE):
+            detected_skills.add(skill)
+
+    for skills in SKILL_DATABASE.values():
+        for skill in skills:
+            if _skill_in_text(skill, text):
+                detected_skills.add(skill)
+
+    if use_fallback and not detected_skills:
+        detected_skills = {
+            "python", "sql", "excel", "tableau", "power bi",
+            "machine learning", "aws", "communication", "project management"
+        }
+
+    return sorted(detected_skills)
+
+
+def extract_keywords(text: str, limit: int = 12) -> List[str]:
+    """Extract high-signal keywords from text."""
+    text = (text or "").lower()
+    tokens = re.findall(r"[a-z][a-z0-9+#./-]{2,}", text)
+    frequencies = {}
+
+    for token in tokens:
+        if token in KEYWORD_STOPWORDS:
+            continue
+        if token.isdigit():
+            continue
+        frequencies[token] = frequencies.get(token, 0) + 1
+
+    ranked = sorted(frequencies.items(), key=lambda item: (-item[1], item[0]))
+    return [token for token, _ in ranked[:limit]]
+
+
+def extract_tools(text: str) -> List[str]:
+    """Extract tools/technologies from text."""
+    text = (text or "").lower()
+    detected_tools = [tool for tool in TOOL_KEYWORDS if _skill_in_text(tool, text)]
+    return sorted(set(detected_tools))
+
+
+def extract_experience_level(text: str) -> Dict:
+    """Infer experience requirement/level from text."""
+    text = (text or "").lower()
+    years_found = [int(value) for value in EXPERIENCE_PATTERN.findall(text)]
+    years_required = max(years_found) if years_found else 0
+
+    level = "Not specified"
+    if "intern" in text or "entry level" in text or "fresher" in text:
+        level = "Entry Level"
+    elif any(token in text for token in ["senior", "lead", "principal", "staff"]):
+        level = "Senior"
+    elif any(token in text for token in ["junior", "associate"]):
+        level = "Junior"
+    elif years_required >= 8:
+        level = "Senior"
+    elif years_required >= 4:
+        level = "Mid-Level"
+    elif years_required >= 1:
+        level = "Junior"
+
+    return {
+        "years_required": years_required,
+        "experience_level": level
+    }
+
+
+def parse_job_description(jd_text: str) -> Dict:
+    """Parse a JD into a structured profile."""
+    required_skills = detect_required_skills(jd_text)
+    experience = extract_experience_level(jd_text)
+    return {
+        "required_skills": required_skills,
+        "tools": extract_tools(jd_text),
+        "keywords": extract_keywords(jd_text),
+        "experience_level": experience["experience_level"],
+        "years_required": experience["years_required"]
+    }
+
+
+def parse_resume_profile(resume_text: str) -> Dict:
+    """Parse a resume into a structured candidate profile."""
+    resume_text = (resume_text or "").lower()
+    experience = extract_experience_level(resume_text)
+    project_mentions = len(re.findall(r"\bprojects?\b", resume_text, re.IGNORECASE))
+    portfolio_signals = len(re.findall(r"\bgithub\b|\bportfolio\b|\bcase study\b", resume_text, re.IGNORECASE))
+
+    return {
+        "skills": detect_skills_in_text(resume_text, use_fallback=False),
+        "tools": extract_tools(resume_text),
+        "projects": {
+            "project_mentions": project_mentions,
+            "portfolio_signals": portfolio_signals
+        },
+        "experience": {
+            "years": experience["years_required"],
+            "level_signal": experience["experience_level"]
+        }
+    }
+
+
+def get_verdict_label(fit_score: int) -> Dict:
+    """Map fit score to final verdict."""
+    if fit_score >= 75:
+        return {"label": "Good Fit", "key": "good_fit"}
+    if fit_score >= 50:
+        return {"label": "Moderate", "key": "moderate"}
+    return {"label": "Low Fit", "key": "low_fit"}
+
+
+def build_candidate_recommendations(matched: List[str], missing: List[str], fit_score: int) -> List[str]:
+    """Generate concise recommendations for recruiter output."""
+    recommendations = []
+
+    if fit_score >= 80:
+        recommendations.append("Strong alignment with required technical stack.")
+        recommendations.append("Proceed to technical screening and role-depth validation.")
+    elif fit_score >= 60:
+        recommendations.append("Good baseline alignment with the role expectations.")
+        recommendations.append("Targeted upskilling can close remaining gaps quickly.")
+    elif fit_score >= 45:
+        recommendations.append("Moderate alignment; consider for pipeline roles with mentoring.")
+        recommendations.append("Focused development plan recommended before final evaluation.")
+    else:
+        recommendations.append("Limited alignment for the current role requirements.")
+        recommendations.append("Recommend significant upskilling before progressing.")
+
+    if len(missing) <= 1 and fit_score >= 60:
+        recommendations.append("Only one critical gap observed; improvement is likely achievable quickly.")
+    elif len(missing) >= 3:
+        recommendations.append("Multiple critical gaps identified; prioritize structured learning path.")
+
+    return recommendations[:3]
+
+
+def build_candidate_analysis_payload(resume_text: str, jd_text: str, jd_name: str, jd_source: str) -> Dict:
+    """Build candidate-mode analysis payload for a single JD."""
+    required_skills = detect_required_skills(jd_text)
+    score_result = score_resume(resume_text, required_skills)
+    all_detected_skills = list(set(score_result["matched"] + score_result["extras"]))
+
+    skill_gaps = []
+    for missing_skill in score_result["missing"]:
+        related = find_related_skills(missing_skill)
+        skill_gaps.append({
+            "skill": missing_skill,
+            "related_skills": related,
+            "priority": "high" if missing_skill in ["python", "sql", "communication"] else "medium",
+            "learning_resources": [
+                f"Online course: {missing_skill.title()} Fundamentals",
+                "Hands-on project tutorial",
+                "Industry certification preparation"
+            ]
+        })
+
+    suggestions = generate_improvement_suggestions(
+        score_result["matched"],
+        score_result["missing"],
+        score_result["extras"]
+    )
+
+    alternative_roles = suggest_alternative_roles(all_detected_skills)
+
+    learning_path = []
+    for i, missing in enumerate(score_result["missing"][:3], 1):
+        learning_path.append({
+            "week": i,
+            "focus": missing,
+            "actions": [
+                "Complete online course",
+                "Build small project",
+                "Practice with exercises",
+                "Get feedback from community"
+            ],
+            "resources": [
+                f"Course: {missing.title()} Masterclass",
+                "GitHub project ideas",
+                "Practice platform exercises"
+            ]
+        })
+
+    return {
+        "jd_name": jd_name,
+        "jd_source": jd_source,
+        "jd_profile": parse_job_description(jd_text),
+        "fit_score": score_result["fit"],
+        "skills": {
+            "matched": score_result["matched"],
+            "missing": score_result["missing"],
+            "extras": score_result["extras"],
+            "total_detected": len(all_detected_skills)
+        },
+        "skill_gaps": skill_gaps,
+        "suggestions": suggestions,
+        "alternative_roles": alternative_roles,
+        "learning_path": learning_path,
+        "summary": {
+            "match_percentage": score_result["fit"],
+            "strengths": len(score_result["matched"]),
+            "improvement_areas": len(score_result["missing"]),
+            "unique_assets": len(score_result["extras"])
+        }
+    }
+
 def extract_from_pdf(path: str) -> str:
     """Extract text from PDF files"""
     text = ""
@@ -99,11 +337,14 @@ def extract_from_docx_manual(path: str) -> str:
             # Parse XML
             root = ET.fromstring(document_xml)
             
-            # Define namespace
+            # Define namespace (WordprocessingML)
             ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
-            
-            # Find all text elements
+
+            # Find all text elements. If namespace-prefixed lookup fails,
+            # fall back to local-name matching for broader DOCX compatibility.
             text_elements = root.findall('.//w:t', ns)
+            if not text_elements:
+                text_elements = [elem for elem in root.iter() if elem.tag.endswith('}t') or elem.tag == 't']
             
             # Extract text
             for elem in text_elements:
@@ -178,35 +419,14 @@ def extract_text(file_storage) -> str:
 
 def detect_required_skills(jd_text: str) -> List[str]:
     """Enhanced skill detection from job description"""
-    jd_text = jd_text.lower()
-    detected_skills = set()
-    
-    # Pattern matching
-    for skill, pattern in SKILL_PATTERNS.items():
-        if re.search(pattern, jd_text, re.IGNORECASE):
-            detected_skills.add(skill)
-    
-    # Category matching
-    for category, skills in SKILL_DATABASE.items():
-        for skill in skills:
-            if skill in jd_text:
-                detected_skills.add(skill)
-    
-    # Fallback to default skills if none detected
-    if not detected_skills:
-        detected_skills = set([
-            "python", "sql", "excel", "tableau", "power bi",
-            "machine learning", "aws", "communication", "project management"
-        ])
-    
-    return sorted(list(detected_skills))
+    return detect_skills_in_text(jd_text, use_fallback=True)
 
 def score_resume(resume_text: str, required_skills: List[str]) -> Dict:
     """Calculate resume score with enhanced matching"""
-    resume_text = resume_text.lower()
+    resume_text = (resume_text or "").lower()
     
     # Exact matching
-    matched = [skill for skill in required_skills if skill in resume_text]
+    matched = [skill for skill in required_skills if _skill_in_text(skill, resume_text)]
     
     # Pattern matching for variations
     for skill in required_skills:
@@ -222,13 +442,10 @@ def score_resume(resume_text: str, required_skills: List[str]) -> Dict:
     missing = [skill for skill in required_skills if skill not in matched]
     
     # Find extra skills (not in required but in resume)
-    all_skills = []
-    for category in SKILL_DATABASE.values():
-        all_skills.extend(category)
-    
+    all_skills = [skill for category in SKILL_DATABASE.values() for skill in category]
     extra_skills = []
     for skill in all_skills:
-        if skill not in required_skills and skill in resume_text:
+        if skill not in required_skills and _skill_in_text(skill, resume_text):
             extra_skills.append(skill)
     
     # Calculate fit percentage with weighted scoring
@@ -333,54 +550,130 @@ def home():
 @app.route("/analyze", methods=["POST"])
 def analyze():
     try:
-        # Extract job description
+        # Gather all JD inputs as separate analyses (text + each uploaded JD file)
         jd_text = request.form.get("jd_text", "").strip().lower()
-        jd_file = request.files.get("jd_file")
-        
-        if jd_file and jd_file.filename:
-            jd_text += " " + extract_text(jd_file)
-        
-        # Detect required skills
-        required_skills = detect_required_skills(jd_text)
-        
-        # Process resumes
+        jd_files = []
+        for field_name in ["jd_file", "jd_files[]"]:
+            for jd_file in request.files.getlist(field_name):
+                if jd_file and jd_file.filename:
+                    jd_files.append(jd_file)
+
+        jd_documents = []
+        if jd_text:
+            jd_documents.append({
+                "jd_name": "Pasted JD",
+                "jd_source": "text",
+                "text": jd_text
+            })
+
+        for index, jd_file in enumerate(jd_files, start=1):
+            jd_documents.append({
+                "jd_name": jd_file.filename or f"JD File {index}",
+                "jd_source": "file",
+                "text": extract_text(jd_file)
+            })
+
+        if not jd_documents:
+            jd_documents.append({
+                "jd_name": "Default Skill Profile",
+                "jd_source": "default",
+                "text": jd_text
+            })
+
+        # Process resumes once, then score against each JD independently
         resumes = request.files.getlist("resumes[]")
         if not resumes:
             return jsonify({"error": "No resumes uploaded!"}), 400
-        
-        results = []
+
+        extracted_resumes = []
         for resume in resumes:
-            if resume.filename:
+            if resume and resume.filename:
                 resume_text = extract_text(resume)
-                score_result = score_resume(resume_text, required_skills)
-                
-                results.append({
+                extracted_resumes.append({
                     "name": resume.filename,
+                    "text": resume_text,
+                    "profile": parse_resume_profile(resume_text)
+                })
+
+        if not extracted_resumes:
+            return jsonify({"error": "No valid resume files uploaded!"}), 400
+
+        jd_analyses = []
+        structured_results = {}
+        for jd_doc in jd_documents:
+            jd_profile = parse_job_description(jd_doc["text"])
+            required_skills = jd_profile["required_skills"]
+            results = []
+            jd_candidate_map = {}
+
+            for resume in extracted_resumes:
+                score_result = score_resume(resume["text"], required_skills)
+                verdict = get_verdict_label(score_result["fit"])
+
+                recommendations = build_candidate_recommendations(
+                    score_result["matched"],
+                    score_result["missing"],
+                    score_result["fit"]
+                )
+
+                candidate_result = {
+                    "name": resume["name"],
                     "fit": score_result["fit"],
+                    "match_score": score_result["fit"],
                     "matched": score_result["matched"],
                     "missing": score_result["missing"],
                     "extras": score_result["extras"],
                     "matched_count": score_result["matched_count"],
                     "missing_count": score_result["missing_count"],
-                    "extra_count": score_result["extra_count"]
-                })
-        
-        # Sort by fit score
-        results = sorted(results, key=lambda x: x["fit"], reverse=True)
-        
-        # Calculate statistics
-        total_candidates = len(results)
-        avg_fit = round(sum(r["fit"] for r in results) / total_candidates) if results else 0
-        
+                    "extra_count": score_result["extra_count"],
+                    "recommendations": recommendations,
+                    "verdict": verdict["label"],
+                    "verdict_label": verdict["label"],
+                    "verdict_key": verdict["key"],
+                    "resume_profile": resume["profile"]
+                }
+
+                results.append(candidate_result)
+                jd_candidate_map[resume["name"]] = {
+                    "match_score": candidate_result["match_score"],
+                    "matched_skills": candidate_result["matched"],
+                    "missing_skills": candidate_result["missing"],
+                    "recommendations": candidate_result["recommendations"],
+                    "final_verdict": candidate_result["verdict"]
+                }
+
+            results = sorted(results, key=lambda x: x["fit"], reverse=True)
+
+            total_candidates = len(results)
+            avg_fit = round(sum(r["fit"] for r in results) / total_candidates) if results else 0
+
+            jd_analyses.append({
+                "jd_name": jd_doc["jd_name"],
+                "jd_source": jd_doc["jd_source"],
+                "jd_profile": jd_profile,
+                "required_skills": required_skills,
+                "results": results,
+                "statistics": {
+                    "total_candidates": total_candidates,
+                    "average_fit": avg_fit,
+                    "top_fit": results[0]["fit"] if results else 0,
+                    "skills_detected": len(required_skills)
+                }
+            })
+            structured_results[jd_doc["jd_name"]] = jd_candidate_map
+
+        primary_analysis = jd_analyses[0]
         return jsonify({
-            "required_skills": required_skills,
-            "results": results,
-            "statistics": {
-                "total_candidates": total_candidates,
-                "average_fit": avg_fit,
-                "top_fit": results[0]["fit"] if results else 0,
-                "skills_detected": len(required_skills)
-            }
+            # Backward-compatible fields (first JD)
+            "required_skills": primary_analysis["required_skills"],
+            "results": primary_analysis["results"],
+            "statistics": primary_analysis["statistics"],
+            # Multi-JD payload
+            "jd_count": len(jd_analyses),
+            "multi_jd": len(jd_analyses) > 1,
+            "jd_analyses": jd_analyses,
+            "structured_results": structured_results,
+            "viewer_prompt": "Select Job Description to view analysis results"
         })
         
     except Exception as e:
@@ -394,88 +687,67 @@ def analyze_candidate():
     try:
         resume = request.files.get("candidate_resume")
         jd_text = request.form.get("jd_text", "").strip().lower()
+        jd_files = []
+        for field_name in ["candidate_jd_file", "candidate_jd_files[]"]:
+            for jd_file in request.files.getlist(field_name):
+                if jd_file and jd_file.filename:
+                    jd_files.append(jd_file)
         
         if not resume:
             return jsonify({"error": "No resume uploaded!"}), 400
         
-        if not jd_text:
-            return jsonify({"error": "Job description is required!"}), 400
+        if not jd_text and not jd_files:
+            return jsonify({"error": "At least one job description is required!"}), 400
         
         # Extract text
         resume_text = extract_text(resume)
-        
-        # Detect required skills from JD
-        required_skills = detect_required_skills(jd_text)
-        
-        # Score resume
-        score_result = score_resume(resume_text, required_skills)
-        
-        # Get all detected skills
-        all_detected_skills = list(set(score_result["matched"] + score_result["extras"]))
-        
-        # Generate skill gaps analysis
-        skill_gaps = []
-        for missing_skill in score_result["missing"]:
-            related = find_related_skills(missing_skill)
-            skill_gaps.append({
-                "skill": missing_skill,
-                "related_skills": related,
-                "priority": "high" if missing_skill in ["python", "sql", "communication"] else "medium",
-                "learning_resources": [
-                    f"Online course: {missing_skill.title()} Fundamentals",
-                    "Hands-on project tutorial",
-                    "Industry certification preparation"
-                ]
+
+        jd_documents = []
+        if jd_text:
+            jd_documents.append({
+                "jd_name": "Pasted JD",
+                "jd_source": "text",
+                "text": jd_text
             })
-        
-        # Generate improvement suggestions
-        suggestions = generate_improvement_suggestions(
-            score_result["matched"],
-            score_result["missing"],
-            score_result["extras"]
-        )
-        
-        # Suggest alternative roles
-        alternative_roles = suggest_alternative_roles(all_detected_skills)
-        
-        # Generate learning path
-        learning_path = []
-        for i, missing in enumerate(score_result["missing"][:3], 1):
-            learning_path.append({
-                "week": i,
-                "focus": missing,
-                "actions": [
-                    "Complete online course",
-                    "Build small project",
-                    "Practice with exercises",
-                    "Get feedback from community"
-                ],
-                "resources": [
-                    f"Course: {missing.title()} Masterclass",
-                    "GitHub project ideas",
-                    "Practice platform exercises"
-                ]
+
+        for index, jd_file in enumerate(jd_files, start=1):
+            jd_documents.append({
+                "jd_name": jd_file.filename or f"JD File {index}",
+                "jd_source": "file",
+                "text": extract_text(jd_file)
             })
-        
-        return jsonify({
-            "fit_score": score_result["fit"],
-            "skills": {
-                "matched": score_result["matched"],
-                "missing": score_result["missing"],
-                "extras": score_result["extras"],
-                "total_detected": len(all_detected_skills)
-            },
-            "skill_gaps": skill_gaps,
-            "suggestions": suggestions,
-            "alternative_roles": alternative_roles,
-            "learning_path": learning_path,
-            "summary": {
-                "match_percentage": score_result["fit"],
-                "strengths": len(score_result["matched"]),
-                "improvement_areas": len(score_result["missing"]),
-                "unique_assets": len(score_result["extras"])
-            }
-        })
+
+        jd_analyses = []
+        for jd_doc in jd_documents:
+            jd_analyses.append(
+                build_candidate_analysis_payload(
+                    resume_text,
+                    jd_doc["text"],
+                    jd_doc["jd_name"],
+                    jd_doc["jd_source"]
+                )
+            )
+
+        primary_analysis = jd_analyses[0]
+        response = {
+            # Backward-compatible fields (first JD)
+            "fit_score": primary_analysis["fit_score"],
+            "skills": primary_analysis["skills"],
+            "skill_gaps": primary_analysis["skill_gaps"],
+            "suggestions": primary_analysis["suggestions"],
+            "alternative_roles": primary_analysis["alternative_roles"],
+            "learning_path": primary_analysis["learning_path"],
+            "summary": primary_analysis["summary"],
+            # Multi-JD payload
+            "jd_count": len(jd_analyses),
+            "multi_jd": len(jd_analyses) > 1,
+            "candidate_jd_analyses": jd_analyses
+        }
+
+        if len(jd_analyses) > 1:
+            response["viewer_prompt"] = "Select Job Description to view analysis results"
+
+        return jsonify(response)
         
     except Exception as e:
         print(f"Candidate analysis error: {e}")
@@ -581,9 +853,15 @@ def test_upload():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    print("Starting AI Job Analyzer Server...")
+    print("Starting InterSyncIQ Server...")
     print("Version: 3.0.0")
     print("Modes: Recruiter & Candidate")
     print("Supported file types: PDF, DOCX, DOC, TXT")
-    print("Server running on http://localhost:5000")
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    
+    # Get port from environment variable (Railway sets this), default to 5000 for local
+    port = int(os.environ.get("PORT", 5000))
+    # Set debug mode based on environment
+    debug_mode = os.environ.get("FLASK_ENV", "development") == "development"
+    
+    print(f"Server running on http://0.0.0.0:{port}")
+    app.run(debug=debug_mode, host="0.0.0.0", port=port)

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Job Analyzer | Smart Recruitment Tool</title>
+    <title>InterSyncIQ | Smart Recruitment Tool</title>
     <link rel="stylesheet" href="static/style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -35,7 +35,7 @@
         <header class="header">
             <div class="logo-container">
                 <i class="fas fa-robot logo-icon"></i>
-                <h1>AI Job Analyzer</h1>
+                <h1>InterSyncIQ</h1>
             </div>
             <p class="tagline">Smart Resume Matching & Career Guidance</p>
             <div class="current-mode" id="currentMode">
@@ -60,20 +60,15 @@
                         <div class="char-counter">
                             <span id="charCount">0</span> characters
                         </div>
-                    </div>
-                    
-                    <div class="file-upload-container">
-                        <div class="upload-option">
-                            <input type="file" id="jdFile" accept=".pdf,.docx,.txt">
-                            <div class="upload-box">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                                <p>Upload Job Description File</p>
-                                <span class="file-types">PDF, DOCX, TXT</span>
-                            </div>
+                        <div class="jd-upload-inline">
+                            <input type="file" id="jdFile" multiple accept=".pdf,.docx,.txt">
+                            <label for="jdFile" class="jd-upload-btn">
+                                <i class="fas fa-paperclip"></i> Upload JD File(s)
+                            </label>
+                            <span class="jd-upload-types">PDF, DOCX, TXT</span>
+                            <span id="jdFileCount" class="jd-upload-count">0 JD files selected</span>
                         </div>
-                        <div class="upload-info">
-                            <p><i class="fas fa-info-circle"></i> The AI will automatically extract skills from both text and uploaded files</p>
-                        </div>
+                        <ul id="jdFileList" class="jd-file-list"></ul>
                     </div>
                 </div>
             </section>
@@ -85,6 +80,9 @@
                     <h2>Resume Upload</h2>
                 </div>
                 <div class="section-body">
+                    <label class="input-label recruiter-upload-label">
+                        <i class="fas fa-cloud-upload-alt"></i> Upload Resumes
+                    </label>
                     <div id="dropArea" class="drop-zone">
                         <div class="drop-content">
                             <i class="fas fa-cloud-upload-alt fa-3x"></i>
@@ -118,44 +116,67 @@
 
         <!-- CANDIDATE VIEW (Hidden by default) -->
         <div id="candidateView" class="view-content">
-            <!-- CANDIDATE RESUME UPLOAD -->
-            <section class="section-card">
-                <div class="section-header">
-                    <i class="fas fa-user-graduate"></i>
-                    <h2>Your Resume Analysis</h2>
-                </div>
-                <div class="section-body">
-                    <div class="input-group">
-                        <label for="candidateResume" class="input-label">
-                            <i class="fas fa-file-upload"></i> Upload Your Resume
-                        </label>
-                        <div class="upload-option">
-                            <input type="file" id="candidateResume" accept=".pdf,.docx,.txt">
-                            <div class="upload-box">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                                <p>Click to Upload Resume</p>
-                                <span class="file-types">PDF, DOCX, TXT (Max 10MB)</span>
+            <div class="candidate-setup-grid">
+                <section class="section-card">
+                    <div class="section-header">
+                        <i class="fas fa-briefcase"></i>
+                        <h2>Target Job Description</h2>
+                    </div>
+                    <div class="section-body">
+                        <div class="input-group">
+                            <label for="candidateJD" class="input-label">
+                                <i class="fas fa-briefcase"></i> Paste Job Description
+                            </label>
+                            <textarea id="candidateJD" placeholder="Paste the job description you're applying for..."></textarea>
+                            <div class="char-counter">
+                                <span id="candidateCharCount">0</span> characters
+                            </div>
+                            <div class="jd-upload-inline candidate-jd-upload">
+                                <input type="file" id="candidateJDFile" multiple accept=".pdf,.docx,.txt">
+                                <label for="candidateJDFile" class="jd-upload-btn">
+                                    <i class="fas fa-paperclip"></i> Upload JD File(s)
+                                </label>
+                                <span class="jd-upload-types">PDF, DOCX, TXT</span>
+                                <span id="candidateJDFileCount" class="jd-upload-count">0 JD files selected</span>
+                            </div>
+                            <ul id="candidateJDFileList" class="jd-file-list"></ul>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- CANDIDATE RESUME UPLOAD -->
+                <section class="section-card">
+                    <div class="section-header">
+                        <i class="fas fa-file-upload"></i>
+                        <h2>Upload Your Resume</h2>
+                    </div>
+                    <div class="section-body">
+                        <div class="input-group">
+                            <label for="candidateResume" class="input-label">
+                                <i class="fas fa-file-upload"></i> Resume File
+                            </label>
+                            <div class="upload-option">
+                                <input type="file" id="candidateResume" accept=".pdf,.docx,.txt">
+                                <div class="upload-box">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    <p>Click to Upload Resume</p>
+                                    <span class="file-types">PDF, DOCX, TXT (Max 10MB)</span>
+                                </div>
+                            </div>
+                            <div id="candidateResumePreview" class="candidate-resume-preview" style="display: none;">
+                                <i class="fas fa-file-alt"></i>
+                                <span id="candidateResumeName"></span>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="input-group">
-                        <label for="candidateJD" class="input-label">
-                            <i class="fas fa-briefcase"></i> Target Job Description
-                        </label>
-                        <textarea id="candidateJD" placeholder="Paste the job description you're applying for..."></textarea>
-                        <div class="char-counter">
-                            <span id="candidateCharCount">0</span> characters
+
+                        <div class="action-buttons">
+                            <button id="analyzeCandidateBtn" class="btn-primary">
+                                <i class="fas fa-chart-line"></i> Analyze My Fit
+                            </button>
                         </div>
                     </div>
-                    
-                    <div class="action-buttons">
-                        <button id="analyzeCandidateBtn" class="btn-primary">
-                            <i class="fas fa-chart-line"></i> Analyze My Fit
-                        </button>
-                    </div>
-                </div>
-            </section>
+                </section>
+            </div>
 
             <!-- CANDIDATE RESULTS SECTION -->
             <section class="section-card" id="candidateResults" style="display: none;">
@@ -164,86 +185,78 @@
                     <h2>Your Analysis Results</h2>
                 </div>
                 <div class="section-body">
-                    <!-- Fit Score -->
-                    <div class="candidate-score-section">
-                        <div class="fit-score-card">
-                            <div class="score-circle" id="candidateFitCircle">
-                                <span id="candidateFitScore">0%</span>
-                            </div>
-                            <div class="score-details">
-                                <h3>Overall Match Score</h3>
-                                <p id="fitFeedback">Analysis in progress...</p>
-                            </div>
-                        </div>
+                    <div id="candidateJDSelectorWrap" class="candidate-jd-selector" style="display: none;">
+                        <label for="candidateJDSelect" class="input-label">
+                            <i class="fas fa-filter"></i> Select Job Description
+                        </label>
+                        <select id="candidateJDSelect"></select>
                     </div>
-
-                    <!-- Skills Analysis -->
-                    <div class="skills-analysis-grid">
-                        <div class="analysis-card matched">
-                            <h4><i class="fas fa-check-circle"></i> Your Strong Skills</h4>
-                            <div id="candidateMatched" class="skills-container"></div>
-                            <p class="card-subtitle">Skills matching the job requirements</p>
-                        </div>
-                        
-                        <div class="analysis-card missing">
-                            <h4><i class="fas fa-exclamation-circle"></i> Skills to Develop</h4>
-                            <div id="candidateMissing" class="skills-container"></div>
-                            <p class="card-subtitle">Required skills you need to learn</p>
-                        </div>
-                        
-                        <div class="analysis-card extra">
-                            <h4><i class="fas fa-plus-circle"></i> Your Unique Skills</h4>
-                            <div id="candidateExtra" class="skills-container"></div>
-                            <p class="card-subtitle">Additional valuable skills you have</p>
-                        </div>
-                    </div>
-
-                    <!-- Career Recommendations -->
-                    <div class="recommendations-section">
-                        <h3><i class="fas fa-lightbulb"></i> Career Recommendations</h3>
-                        
-                        <div class="recommendation-grid">
-                            <div class="recommendation-card">
-                                <div class="rec-icon">
-                                    <i class="fas fa-graduation-cap"></i>
+                    <div class="candidate-dashboard">
+                        <!-- Top Summary Card -->
+                        <div class="candidate-score-section">
+                            <div class="fit-score-card">
+                                <div class="score-circle" id="candidateFitCircle">
+                                    <span id="candidateFitScore">0%</span>
                                 </div>
-                                <h4>Learning Path</h4>
-                                <div id="learningPath" class="rec-content">
-                                    <!-- Dynamic learning recommendations -->
-                                </div>
-                            </div>
-                            
-                            <div class="recommendation-card">
-                                <div class="rec-icon">
-                                    <i class="fas fa-briefcase"></i>
-                                </div>
-                                <h4>Alternative Roles</h4>
-                                <div id="alternativeRoles" class="rec-content">
-                                    <!-- Dynamic role suggestions -->
-                                </div>
-                            </div>
-                            
-                            <div class="recommendation-card">
-                                <div class="rec-icon">
-                                    <i class="fas fa-chart-line"></i>
-                                </div>
-                                <h4>Improvement Tips</h4>
-                                <div id="improvementTips" class="rec-content">
-                                    <!-- Dynamic improvement tips -->
+                                <div class="score-details">
+                                    <h3>Overall Match Score</h3>
+                                    <p id="fitFeedback">Analysis in progress...</p>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Action Plan -->
-                    <div class="action-plan">
-                        <h3><i class="fas fa-tasks"></i> 30-Day Action Plan</h3>
-                        <div id="actionPlan" class="plan-steps">
-                            <!-- Dynamic action steps -->
+                        <!-- Skill Snapshot -->
+                        <div class="skills-analysis-grid compact-two">
+                            <div class="analysis-card matched">
+                                <h4><i class="fas fa-check-circle"></i> Matched Skills</h4>
+                                <div id="candidateMatched" class="skills-container"></div>
+                            </div>
+
+                            <div class="analysis-card missing">
+                                <h4><i class="fas fa-exclamation-circle"></i> Missing Skills</h4>
+                                <div id="candidateMissing" class="skills-container"></div>
+                            </div>
                         </div>
-                        <button id="exportPlanBtn" class="btn-secondary">
-                            <i class="fas fa-download"></i> Download Action Plan
-                        </button>
+
+                        <!-- Key Insights -->
+                        <div class="dashboard-card compact-card">
+                            <h3><i class="fas fa-lightbulb"></i> Key Insights</h3>
+                            <ul id="candidateInsights" class="compact-list"></ul>
+                        </div>
+
+                        <!-- Recommended Actions -->
+                        <div class="dashboard-card compact-card">
+                            <h3><i class="fas fa-tasks"></i> Recommended Actions</h3>
+                            <div class="priority-grid">
+                                <div class="priority-card high">
+                                    <h4>High Priority</h4>
+                                    <ul id="candidateActionHigh" class="compact-list"></ul>
+                                </div>
+                                <div class="priority-card medium">
+                                    <h4>Medium Priority</h4>
+                                    <ul id="candidateActionMedium" class="compact-list"></ul>
+                                </div>
+                                <div class="priority-card optional">
+                                    <h4>Optional</h4>
+                                    <ul id="candidateActionOptional" class="compact-list"></ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Alternative Roles -->
+                        <div class="dashboard-card compact-card">
+                            <h3><i class="fas fa-briefcase"></i> Alternative Roles</h3>
+                            <div id="alternativeRoles" class="role-card-grid"></div>
+                        </div>
+
+                        <!-- Quick Action Plan -->
+                        <div class="dashboard-card compact-card">
+                            <h3><i class="fas fa-bolt"></i> Quick Action Plan</h3>
+                            <div id="actionPlan" class="quick-plan-lines"></div>
+                            <button id="exportPlanBtn" class="btn-secondary">
+                                <i class="fas fa-download"></i> Download Action Plan
+                            </button>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -263,7 +276,7 @@
                 <div class="results-summary">
                     <div class="summary-card">
                         <i class="fas fa-tasks"></i>
-                        <h3>Required Skills</h3>
+                        <h3>Skill Coverage Insights</h3>
                         <div id="skillsContainer" class="skills-container"></div>
                     </div>
                     <div class="summary-card">
@@ -291,7 +304,7 @@
 
         <!-- FOOTER -->
         <footer class="footer">
-            <p>AI Job Analyzer © 2024 | Smart Recruitment & Career Development</p>
+            <p>InterSyncIQ © 2024 | Smart Recruitment & Career Development</p>
             <div class="footer-links">
                 <a href="#"><i class="fas fa-question-circle"></i> Help</a>
                 <a href="#"><i class="fas fa-cog"></i> Settings</a>
