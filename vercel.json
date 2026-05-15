@@ -1,0 +1,15 @@
+{
+  "buildCommand": "pip install -r requirements.txt",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api" }
+  ],
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 60,
+      "memory": 3008
+    }
+  },
+  "env": {
+    "FLASK_ENV": "production"
+  }
+}

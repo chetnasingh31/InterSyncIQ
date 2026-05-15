@@ -314,119 +314,123 @@ After running recruiter analysis:
 
 ---
 
-## 🚀 Deployment Guide (Render)
+## 🚀 Deployment Guide (Vercel)
 
-InterSyncIQ is deployed and managed using **Render**, a modern platform for hosting web applications with built-in free tier support.
+InterSyncIQ is live on **Vercel** at: **https://inter-sync-iq.vercel.app**
+
+Vercel is a modern serverless platform optimized for Python applications.
+
+### Access the Live Application
+
+🌐 **Live URL:** [https://inter-sync-iq.vercel.app](https://inter-sync-iq.vercel.app)
 
 ### Prerequisites for Deployment
 
 - GitHub account with repository access
-- Render account (free tier available at [render.com](https://render.com))
+- Vercel account (free tier available at [vercel.com](https://vercel.com))
 
-### One-Click Deployment Steps
+### Quick Deployment Options
+
+#### Option 1: Deploy via Vercel CLI (Recommended)
+
+```bash
+npm install -g vercel
+vercel
+```
+
+#### Option 2: Deploy via GitHub Integration
 
 1. **Push to GitHub**
    ```bash
    git add .
-   git commit -m "Ready for deployment"
+   git commit -m "Ready for Vercel deployment"
    git push origin main
    ```
 
-2. **Deploy on Render**
-   - Go to [render.com](https://render.com)
-   - Click "New +" → "Web Service"
-   - Click "Deploy existing repository" or paste GitHub repo URL
-   - Select your `InterSyncIQ` repository
-   - Render automatically detects Flask and configures deployment
+2. **Deploy on Vercel**
+   - Go to [vercel.com](https://vercel.com) and sign in
+   - Click "New Project"
+   - Select your GitHub repository
+   - Click "Import"
+   - Vercel auto-detects Python and deploys automatically
 
-3. **Render Automatic Configuration**
-   - Reads `runtime.txt` → Uses Python 3.11.8
-   - Reads `Procfile` → Runs `gunicorn app:app` in production
-   - Installs `requirements.txt` dependencies
-   - Automatically sets PORT environment variable
-   - Creates free SSL/TLS certificate
+3. **Access Your Live App**
+   - App is live globally within 2-3 minutes
+   - Auto-deploys on every GitHub push
+   - Live at: **https://inter-sync-iq.vercel.app**
 
-4. **Access Your Live App**
-   - Render assigns a unique domain (e.g., `intersynciq.onrender.com`)
-   - Your app is live and accessible globally within 3-5 minutes
-   - Auto-deploys on GitHub push (if connected)
-   - View logs and manage deployment from Render dashboard
+### How It Works
 
-### Environment Variables
-
-Render automatically handles:
-- **PORT** – Dynamically assigned (Render sets this; `app.py` reads it)
-- **PYTHON_VERSION** – Set to 3.11 (from `runtime.txt`)
-
-You can add custom variables in Render dashboard:
-- Settings → Environment → Add Environment Variable
+**Vercel Configuration:**
+- `vercel.json` – Defines serverless function, rewrites, and environment
+- `api/index.py` – Flask app runs as a serverless function
+- `static/` & `templates/` – Served as static assets
+- Automatic scaling and 99.99% uptime
+- Free SSL/TLS included
 
 ### Local Testing Before Deployment
 
-To test production setup locally:
+To test locally before deployment:
 
 ```bash
-# Install production dependencies (including gunicorn)
+# Install dependencies
 pip install -r requirements.txt
 
-# Run with gunicorn (like Railway does)
-gunicorn app:app --bind 0.0.0.0:8000
+# Run locally (like app.py)
+python app.py
 
-# Visit http://localhost:8000
+# Visit http://localhost:5000
 ```
 
 ### Monitoring & Management
 
-**View Real-Time Logs:**
-- Render Dashboard → Select your service → Logs tab
-- Tail logs in real-time
+**View Logs:**
+- Vercel Dashboard → Select project → Deployments tab
+- Click deployment → Logs section
 
-**View Deployment Status:**
-- Render Dashboard → Deployments tab → See status, start time, duration
+**View Analytics:**
+- Vercel Dashboard → Analytics tab
+- Monitor bandwidth, requests, performance
 
-**Scale or Modify:**
-- Increase memory: Settings → Instance Type (paid tier)
-- Change Python version: Update `runtime.txt` → Push to GitHub → Auto-redeploy
-- Restart app: Settings → Restart instance
+**Environment Variables:**
+- Project Settings → Environment Variables
+- Add custom environment variables as needed
+
+**Custom Domain:**
+- Project Settings → Domains
+- Add your custom domain (requires DNS configuration)
 
 ### Key Files for Deployment
 
 | File | Purpose |
 |------|---------|
-| `Procfile` | Tells Render how to start the app (gunicorn) |
-| `runtime.txt` | Specifies Python version (3.11.8) |
-| `requirements.txt` | Lists all Python dependencies (includes gunicorn) |
-| `app.py` | Main Flask application |
+| `api/index.py` | Serverless Flask function (Vercel entry point) |
+| `vercel.json` | Vercel configuration (routing, env, memory) |
+| `requirements.txt` | Python dependencies |
+| `.vercelignore` | Files to exclude from deployment |
+| `static/` | CSS, JavaScript, assets |
+| `templates/` | HTML templates |
 
 ### Troubleshooting Deployment
 
-**Build Fails:**
-- Check Render logs for specific error
-- Ensure all dependencies are in `requirements.txt`
-- Verify `Procfile` format is correct (no extra spaces/newlines)
+**500 Errors on API Calls:**
+- Check Vercel Logs for error messages
+- Verify all dependencies are in `requirements.txt`
 
-**App Crashes After Deploy:**
-- Check logs in Render dashboard
-- Ensure PORT env variable is used in `app.py`
-- Verify all file paths are relative (not hardcoded absolute paths)
+**Static Files Not Loading:**
+- Ensure `static/` and `templates/` folders exist
+- Check `vercel.json` configuration
 
-**Port Issues:**
-- Render assigns PORT dynamically; `app.py` reads from `os.environ.get("PORT")`
-- Don't hardcode port numbers in production code
-
-**Free Tier Limitations:**
-- Free services spin down after 15 minutes of inactivity
-- To always keep running: upgrade to paid tier ($7/month)
-- For active development: free tier is sufficient
+**Build Failure:**
+- Make sure `requirements.txt` has all dependencies
+- Check Python version compatibility (3.8+)
 
 ### Rolling Back Deployment
 
 If deployment has issues:
-1. Go to Render dashboard
-2. Deployments → Select previous working deployment
-3. Click "Redeploy" button to go back to previous version
-
-### Auto-Deploy from GitHub
+1. Go to Vercel dashboard
+2. Deployments tab → Select previous working deployment
+3. Click "Redeploy" to go back to previous version
 
 **Enable Auto-Deploy:**
 1. Connect GitHub repository in Render
