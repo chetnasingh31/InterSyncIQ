@@ -11,6 +11,8 @@ import xml.etree.ElementTree as ET
 from typing import List, Dict, Set
 import traceback
 import io
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 app = Flask(__name__, static_folder='../static', static_url_path='/static', template_folder='../templates')
 CORS(app)
@@ -91,8 +93,18 @@ KEYWORD_STOPWORDS = {
     "them", "through", "about", "what", "when", "where", "how", "need", "etc"
 }
 
-EXPERIENCE_PATTERN = re.compile(r"\b(\d{1,2})\s*\+?\s*(?:years?|yrs?)\b", re.IGNORECASE)
+def calculate_text_similarity(resume_text, jd_text):
+    documents = [resume_text, jd_text]
 
+    vectorizer = TfidfVectorizer(stop_words="english")
+    tfidf_matrix = vectorizer.fit_transform(documents)
+
+    similarity = cosine_similarity(
+        tfidf_matrix[0:1],
+        tfidf_matrix[1:2]
+    )[0][0]
+
+    return round(similarity * 100, 2)
 
 def _skill_in_text(skill: str, text: str) -> bool:
     """Boundary-aware skill matching."""
