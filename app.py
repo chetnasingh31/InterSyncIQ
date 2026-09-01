@@ -102,6 +102,116 @@ def _skill_in_text(skill: str, text: str) -> bool:
     return re.search(pattern, text, re.IGNORECASE) is not None
 
 
+def calculate_ats_score(resume_text: str, jd_text: str = "") -> Dict:
+    """
+    Calculate ATS (Applicant Tracking System) compatibility score for a resume.
+    
+    ATS Score factors:
+    - Resume Structure (40%): presence of key sections
+    - Keyword Optimization (30%): JD keyword density and action verbs
+    - Formatting Compliance (20%): parseable format without issues
+    - Achievement Clarity (10%): quantifiable results and proper formatting
+    
+    Returns score 0-100 and improvement suggestions.
+    """
+    resume_lower = (resume_text or "").lower()
+    jd_lower = (jd_text or "").lower()
+    
+    # 1. RESUME STRUCTURE (40 points max)
+    structure_score = 0
+    structure_checks = {
+        "contact": bool(re.search(r"\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b", resume_lower)),  # Email
+        "phone": bool(re.search(r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b", resume_lower)),  # Phone
+        "experience": bool(re.search(r"\b(work\s+experience|professional\s+experience|employment|experience)\b", resume_lower)),
+        "education": bool(re.search(r"\b(education|bachelor|master|degree|diploma|certification)\b", resume_lower)),
+        "skills": bool(re.search(r"\b(skills?|technical\s+skills?|core\s+competencies?|proficiencies?)\b", resume_lower)),
+    }
+    
+    # Add points for each section (8 points per section = 40 max)
+    structure_score = sum(1 for v in structure_checks.values() if v) * 8
+    
+    # 2. KEYWORD OPTIMIZATION (30 points max)
+    keyword_score = 0
+    if jd_text:
+        jd_skills = detect_skills_in_text(jd_text, use_fallback=False)
+        resume_skills = detect_skills_in_text(resume_text, use_fallback=False)
+        matched_skills = len([s for s in jd_skills if s in resume_skills])
+        if jd_skills:
+            keyword_match_pct = matched_skills / len(jd_skills)
+            keyword_score = min(30, int(keyword_match_pct * 30))
+    else:
+        # If no JD provided, check for general skill presence
+        resume_skills = detect_skills_in_text(resume_text, use_fallback=False)
+        keyword_score = min(30, len(resume_skills) * 2)
+    
+    # 3. FORMATTING COMPLIANCE (20 points max)
+    formatting_score = 20  # Start with full points
+    
+    # Deductions for problematic formatting
+    if re.search(r"[^\x00-\x7F]", resume_text):  # Non-ASCII characters
+        formatting_score -= 5
+    
+    # Check for action verbs (add points for good formatting)
+    action_verbs = ["managed", "led", "developed", "designed", "implemented", "achieved", 
+                   "built", "created", "launched", "improved", "increased", "reduced"]
+    action_verb_count = sum(1 for verb in action_verbs if re.search(rf"\b{verb}\b", resume_lower))
+    formatting_score = min(20, formatting_score + min(5, action_verb_count // 2))
+    
+    # 4. ACHIEVEMENT CLARITY (10 points max)
+    achievement_score = 0
+    # Look for numbers/metrics (quantifiable results)
+    metrics_found = len(re.findall(r"\b\d+\s*(%|million|thousand|increase|decrease|growth|improvement)\b", resume_lower))
+    achievement_score = min(10, metrics_found * 2)
+    
+    # Calculate total ATS score
+    total_ats_score = min(100, structure_score + keyword_score + formatting_score + achievement_score)
+    
+    # Generate improvement suggestions
+    improvements = []
+    if not structure_checks["contact"]:
+        improvements.append("Add your email address and phone number at the top")
+    if not structure_checks["experience"]:
+        improvements.append("Include a clear 'Work Experience' or 'Professional Experience' section")
+    if not structure_checks["education"]:
+        improvements.append("Add an 'Education' section with degrees and institutions")
+    if not structure_checks["skills"]:
+        improvements.append("Include a dedicated 'Skills' section with relevant keywords")
+    
+    if jd_text and keyword_score < 20:
+        improvements.append("Add more keywords from the job description throughout your resume")
+    
+    if action_verb_count < 3:
+        improvements.append("Use strong action verbs like 'Managed', 'Led', 'Developed' to describe achievements")
+    
+    if metrics_found < 2:
+        improvements.append("Include quantifiable results (percentages, numbers) in your accomplishments")
+    
+    # ATS Rating
+    if total_ats_score >= 85:
+        ats_rating = "Excellent"
+    elif total_ats_score >= 70:
+        ats_rating = "Good"
+    elif total_ats_score >= 50:
+        ats_rating = "Fair"
+    else:
+        ats_rating = "Poor"
+    
+    return {
+        "ats_score": total_ats_score,
+        "ats_rating": ats_rating,
+        "breakdown": {
+            "structure": structure_score,
+            "keywords": keyword_score,
+            "formatting": formatting_score,
+            "achievements": achievement_score
+        },
+        "structure_checks": structure_checks,
+        "improvements": improvements[:3],  # Top 3 suggestions
+        "metrics_found": metrics_found,
+        "action_verbs_found": action_verb_count
+    }
+
+
 def detect_skills_in_text(text: str, use_fallback: bool = False) -> List[str]:
     """Detect skills in free text."""
     text = (text or "").lower()

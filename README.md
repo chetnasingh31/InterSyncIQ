@@ -1,41 +1,42 @@
 # InterSyncIQ
 
-**Smart Resume Matching & Career Guidance**
+**Smart Resume Matching, ATS Scoring & Career Guidance Platform**
 
-AI-powered tool to help recruiters and candidates quickly analyze job descriptions and resumes, extract required skills, and surface the best matches and career guidance.
+InterSyncIQ is an AI-powered recruitment and career development platform that bridges the gap between recruiters and candidates. It provides intelligent job description parsing, bulk candidate resume screening, ATS compatibility scoring, multi-JD comparison, and personalized career roadmaps.
 
 ---
 
 ## 🚀 Project Overview
 
-**InterSyncIQ** provides two primary modes:
+InterSyncIQ features two tailored operational modes:
 
-### Recruiter Mode
-- Paste or upload a job description (PDF / DOCX / TXT)
-- Auto-extract required skills and role details
-- Upload multiple resumes and analyze them against the JD
-- Rank candidates and show matching skills + gaps
-- Generate candidate comparison reports
+### 👔 Recruiter Mode
+- **Multi-JD Analysis**: Upload multiple job descriptions (PDF / DOCX / TXT) or paste text simultaneously and evaluate candidates across each JD with instant switching.
+- **Bulk Resume Upload**: Drag & drop multiple candidate resumes for automated processing.
+- **ATS Compatibility Scoring**: Evaluate resume structure, keyword optimization, formatting compliance, and quantifiable metrics.
+- **Skill Coverage Insights**: View aggregate skill coverage across candidate pools to identify talent gaps.
+- **Candidate Comparison Matrix**: Rank candidates by overall fit score, ATS rating, matched skills, and missing capabilities.
+- **BI Dashboard Exports**: Export candidate evaluation data formatted specifically for **Power BI**, **Tableau**, **Excel (XLSX)**, **CSV**, and **JSON**.
 
-### Candidate Mode
-- Upload your resume
-- Paste or upload a job description
-- See how well you match with matching/missing skills highlighted
-- Get targeted career guidance and improvement suggestions
-- Understand skill gaps and career progression paths
+### 🎓 Candidate Mode
+- **Resume Fit Analysis**: Compare your resume against target job description(s) to measure alignment.
+- **ATS Score & Optimization**: Receive an ATS Compatibility Score (0-100) with rating and top actionable feedback to beat ATS filters.
+- **Skill Gap & Priority Roadmap**: Identify matched strengths vs. critical missing skills categorized by High, Medium, and Optional priorities.
+- **Week-by-Week Learning Path**: Get a structured action plan with recommended courses, hands-on projects, and practice milestones.
+- **Alternative Role Suggestions**: Discover alternative career roles based on detected skill overlap with current market salary ranges and growth projections.
+- **Downloadable Action Plan**: Export your personalized career improvement roadmap.
 
 ---
 
 ## ✨ Key Features
 
-- **Job Description Analysis** – Paste text or upload files (PDF, DOCX, TXT)
-- **Automatic Skill Extraction** – Advanced pattern matching and categorized skill detection
-- **Bulk Resume Upload** – Drag & drop interface for multiple candidate resumes
-- **Intelligent Matching** – Calculates match scores and highlights matched/missing/extra skills
-- **Career Guidance** – Role-based career path recommendations with skill requirements
-- **Comprehensive Skill Database** – 60+ skills across programming, data science, cloud, web, analytics, and soft skills
-- **Career Role Profiles** – Predefined roles (Data Scientist, Software Engineer, DevOps, Data Analyst, Product Manager)
-- **Scalable** – Handles files up to 200MB total; 10MB per file (configurable)
+- **ATS Scoring Engine**: 4-part automated scoring evaluating Structure (40%), Keywords (30%), Formatting (20%), and Achievements (10%).
+- **Multi-Job Description Support**: Evaluate resumes against multiple JDs concurrently with independent scoring and UI tab/dropdown switching.
+- **Zero-Dependency DOCX Parsing**: Native XML zip extraction for Word files (`.docx`) without requiring heavy external Python libraries.
+- **Boundary-Aware Regex Skill Matching**: Precision skill detection preventing false positives (e.g., distinguishing "python" from "cpython").
+- **Categorized Skill Database**: 80+ pre-configured skills across 8 domains (Programming, Data Science, Databases, Cloud & DevOps, Web Development, Analytics, Soft Skills, Business).
+- **Interactive Visualizations & Comparison**: Clean candidate ranking cards, ATS indicator badges, and modal popups for deep-dive skill inspection.
+- **Power BI & Tableau Export Ready**: Specialized flattened CSV schema export (`exportToBIDataset`) ready to plug into BI analytics dashboards.
 
 ---
 
@@ -43,42 +44,66 @@ AI-powered tool to help recruiters and candidates quickly analyze job descriptio
 
 ```
 InterSyncIQ/
-├── app.py                 # Flask backend - API endpoints and skill matching logic
-├── requirements.txt       # Python dependencies
-├── README.md             # This file
+├── app.py                 # Core Flask backend server (API endpoints, skill matching, ATS engine)
+├── requirements.txt       # Python dependencies (Flask, Flask-CORS, PyPDF2, Werkzeug)
+├── README.md              # Project documentation
+├── VERCEL_DEPLOYMENT.md   # Deployment guide for Vercel Serverless
+├── Procfile               # Process configuration for Heroku/Render
+├── runtime.txt            # Python version specification
+├── vercel.json            # Vercel deployment & route rewriting rules
+├── .vercelignore          # Files excluded from Vercel deployment
+├── api/
+│   └── index.py           # Vercel Serverless entrypoint (Flask application wrapper)
 ├── templates/
-│   └── index.html        # Main UI (Recruiter + Candidate modes)
+│   └── index.html         # Responsive Single Page Application (Recruiter + Candidate UI)
 └── static/
-    ├── style.css         # Styling and animations
-    ├── script.js         # Frontend logic and mode switching
-    └── chart.min.js      # Chart library for visualizations
+    ├── style.css          # Glassmorphism UI styling, dark/light themes & animations
+    └── script.js          # Client-side UI logic, drag & drop, multi-JD routing, export handlers
 ```
 
 ---
 
 ## 🧩 Tech Stack
 
-- **Backend:** Flask 2.3.3 (Python)
-- **CORS:** Flask-CORS for cross-origin requests
-- **File Handling:** PyPDF2 (PDF parsing), Werkzeug (file upload security)
-- **Frontend:** Vanilla JavaScript, HTML5, CSS3
-- **Styling:** Custom CSS with animations
-- **Charts:** Chart.js for visualizations
-- **Icons:** Font Awesome 6.4.0
+- **Backend Framework:** Python 3.8+ with Flask 2.3.3 & Flask-CORS
+- **Document Parsing:** PyPDF2 (PDF text extraction), Python `zipfile` & `xml.etree` (native DOCX parsing)
+- **Frontend Architecture:** Vanilla HTML5, CSS3 (Modern Glassmorphism & Animations), ES6 JavaScript
+- **Data Export & Visualizations:** SheetJS (`xlsx.full.min.js`), Chart.js
+- **Typography & Icons:** Google Fonts (Poppins & Montserrat), Font Awesome 6.4.0
+- **Deployment Environments:** Vercel Serverless, Railway, Heroku, Render
 
 ---
 
-## 📋 Supported File Types
+## 🤖 ATS Scoring Engine Breakdown
 
-| Format | Support |
-|--------|---------|
-| PDF    | ✅ Yes  |
-| DOCX   | ✅ Yes  |
-| TXT    | ✅ Yes  |
+The Applicant Tracking System (ATS) compatibility engine evaluates resumes against job descriptions using a 100-point algorithm across four core pillars:
 
-**Default file limits:**
-- Individual file: 10MB
-- Total upload: 200MB
+| Pillar | Weight | Evaluation Criteria |
+|:---|:---:|:---|
+| **Resume Structure** | 40% | Presence of essential sections: Contact Info (Email, Phone), Work Experience, Education, Skills section. |
+| **Keyword Optimization** | 30% | Skill overlap and keyword match density against the target Job Description. |
+| **Formatting Compliance** | 20% | ASCII cleanliness, parseable file structure, and action verb density (e.g., *Led*, *Developed*, *Achieved*). |
+| **Achievement Clarity** | 10% | Detection of quantifiable metrics, percentages, and numerical accomplishment indicators. |
+
+**ATS Ratings:**
+- 🟢 **85 - 100%**: Excellent (Highly ATS compatible)
+- 🔵 **70 - 84%**: Good (Minor optimizations recommended)
+- 🟡 **50 - 69%**: Fair (Requires section & keyword improvements)
+- 🔴 **0 - 49%**: Poor (Significant structural and keyword gaps)
+
+---
+
+## 📋 Supported File Types & Limits
+
+| Format | Support | Parser Technique |
+|:---|:---:|:---|
+| **PDF** (`.pdf`) | ✅ Yes | PyPDF2 text extraction |
+| **DOCX** (`.docx`, `.doc`) | ✅ Yes | Native XML Zip parsing & UTF-8 fallback |
+| **TXT** (`.txt`) | ✅ Yes | Native text stream decoding |
+
+**Upload Limits:**
+- **Single File Limit:** 10 MB
+- **Total Payload Limit:** 200 MB
 
 ---
 
@@ -88,19 +113,19 @@ InterSyncIQ/
 - Python 3.8 or higher
 - pip (Python package manager)
 
-### Step 1: Clone & Navigate
+### Step 1: Clone Repository
 ```bash
 git clone https://github.com/your-org/intersynciq.git
 cd InterSyncIQ
 ```
 
-### Step 2: Create Virtual Environment (Recommended)
+### Step 2: Create Virtual Environment
 ```bash
 # Windows
 python -m venv venv
 venv\Scripts\activate
 
-# macOS/Linux
+# macOS / Linux
 python3 -m venv venv
 source venv/bin/activate
 ```
@@ -110,12 +135,12 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Step 4: Run the Application
+### Step 4: Run Application locally
 ```bash
 python app.py
 ```
 
-The application will start at: `http://localhost:5000`
+Access the application in your browser at `http://localhost:5000`.
 
 ---
 
@@ -123,48 +148,36 @@ The application will start at: `http://localhost:5000`
 
 ### Recruiter Mode
 
-1. **Upload Job Description**
-   - Paste JD text directly, or
-   - Click "Upload Job Description" to upload PDF/DOCX/TXT file
-   - System auto-extracts required skills and experience level
-
+1. **Provide Job Description(s)**
+   - Paste job description text into the input box, and/or
+   - Upload one or multiple JD files (`.pdf`, `.docx`, `.txt`).
 2. **Upload Resumes**
-   - Use drag & drop or click to select multiple resume files
-   - System processes all resumes in batch
-
-3. **View Results**
-   - See ranked list of candidates with match scores
-   - For each candidate:
-     - **Match Score** – Percentage of required skills matched
-     - **Matched Skills** – Skills present in both JD and resume
-     - **Missing Skills** – Skills required but not in resume
-     - **Extra Skills** – Additional skills candidate has
-   - Export results to CSV for further analysis
-
-4. **Career Insights** (Optional)
-   - View recommended roles based on extracted skills
-   - See salary ranges and career growth potential for each role
+   - Drag & drop candidate resumes into the upload area or browse files.
+3. **Run Screening**
+   - Click **Analyze Resumes**.
+4. **Review Results**
+   - If multiple JDs were supplied, use the dropdown to switch between JD evaluation views.
+   - Inspect Overall Fit Scores, ATS Scores & Ratings, Skill Coverage Insights, and Top Candidates.
+   - Click any candidate card for modal detail breakdowns and ATS improvement suggestions.
+5. **Export Data**
+   - Click **Export Results** to choose between **BI Dataset (Power BI / Tableau)**, **CSV**, **Excel (XLSX)**, or **JSON**.
 
 ### Candidate Mode
 
-1. **Upload Resume**
-   - Upload your resume (PDF, DOCX, or TXT)
-   - System extracts your skills and experience level
-
-2. **Provide Job Description**
-   - Paste job description text, or
-   - Upload a job description file
-
-3. **View Your Match**
-   - See overall match percentage
-   - Review matched skills (strengths)
-   - Identify missing skills (areas to improve)
-   - Discover extra skills you possess
-
-4. **Career Guidance**
-   - Get personalized recommendations to improve match
-   - Explore related career paths
-   - See skill development suggestions
+1. **Switch Mode**
+   - Toggle to **Candidate Mode** using the top navigation bar.
+2. **Target Role & Resume**
+   - Paste target job description text or attach JD file(s).
+   - Upload your resume (`.pdf`, `.docx`, or `.txt`).
+3. **Analyze Fit**
+   - Click **Analyze My Fit**.
+4. **Review Career Guidance**
+   - View your Overall Match % and ATS Rating.
+   - Inspect matched strengths vs. missing skill gaps.
+   - Review high/medium/optional action items and week-by-week learning roadmap.
+   - Explore alternative career pathways matching your current skill set.
+5. **Export Roadmap**
+   - Click **Download Action Plan** to save your career roadmap.
 
 ---
 
@@ -175,357 +188,128 @@ The application will start at: `http://localhost:5000`
 http://localhost:5000
 ```
 
-### Endpoints
+### 1. Multi-Resume & JD Screening
+- **Endpoint:** `POST /analyze`
+- **Content-Type:** `multipart/form-data`
+- **Form Fields:**
+  - `jd_text` (optional string): Pasted job description text.
+  - `jd_file` / `jd_files[]` (optional files): One or multiple JD files.
+  - `resumes[]` (required files): Array of candidate resume files.
+- **Response:** JSON payload containing multi-JD analyses, required skills, fit scores, ATS scores/ratings, skill coverage, candidate rankings, and recommendations.
 
-#### 1. Extract Skills from Text
-```
-POST /extract-skills
-Content-Type: application/json
+### 2. Candidate Role Fit Analysis
+- **Endpoint:** `POST /analyze-candidate`
+- **Content-Type:** `multipart/form-data`
+- **Form Fields:**
+  - `candidate_resume` (required file): Candidate resume file.
+  - `jd_text` (optional string): Target job description text.
+  - `candidate_jd_file` / `candidate_jd_files[]` (optional files): Target JD files.
+- **Response:** Detailed candidate breakdown including match score, ATS score/rating, skill gaps, learning path, alternative role suggestions, and action plan.
 
-{
-  "text": "5+ years Python experience, AWS, machine learning..."
-}
-
-Response:
-{
-  "skills": {
-    "programming": ["python"],
-    "cloud": ["aws"],
-    "data_science": ["machine learning"]
-  },
-  "experience_years": 5
-}
-```
-
-#### 2. Analyze Resumes Against Job Description
-```
-POST /analyze
-Content-Type: multipart/form-data
-
-Fields:
-- jd_text (string): Job description text
-- resumes (file[]): Multiple resume files
-
-Response:
-{
-  "candidates": [
-    {
-      "filename": "john_doe.pdf",
-      "match_score": 85.5,
-      "matched_skills": ["python", "aws"],
-      "missing_skills": ["kubernetes"],
-      "extra_skills": ["java"]
-    }
-  ],
-  "jd_skills": {
-    "programming": ["python"],
-    "cloud": ["aws", "kubernetes"]
+### 3. Career Guidance
+- **Endpoint:** `POST /career-guidance`
+- **Content-Type:** `application/json`
+- **Request Body:**
+  ```json
+  {
+    "skills": ["python", "sql", "aws", "machine learning"]
   }
-}
-```
+  ```
+- **Response:** Skill categorization and career insight recommendations.
 
-#### 3. Get Career Guidance
-```
-POST /career-guidance
-Content-Type: application/json
+### 4. Health Check
+- **Endpoint:** `GET /health`
+- **Response:**
+  ```json
+  {
+    "status": "healthy",
+    "version": "3.0.0",
+    "modes": ["recruiter", "candidate"]
+  }
+  ```
 
-{
-  "skills": ["python", "machine learning", "sql"]
-}
-
-Response:
-{
-  "recommended_roles": [
-    {
-      "role": "data_scientist",
-      "match_percentage": 90,
-      "required_skills": ["python", "ml", "sql"],
-      "salary_range": "$80,000 - $150,000",
-      "growth": "High"
-    }
-  ]
-}
-```
+### 5. Test File Upload
+- **Endpoint:** `POST /test-upload`
+- **Content-Type:** `multipart/form-data`
+- **Form Field:** `file` (single file)
+- **Response:** Parsed text length and character preview for verification.
 
 ---
 
-## 💾 Configuration
+## 📊 Power BI & Tableau Integration
 
-### Adjustable Settings (in `app.py`)
+InterSyncIQ generates a flattened analytical dataset tailored for BI tools like **Power BI Desktop** and **Tableau**:
 
-```python
-# Maximum content length (total upload size)
-app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024  # 200MB
+1. Run candidate screening in Recruiter Mode.
+2. Click **Export Results** → Select **BI Dataset (Recommended)**.
+3. Import the generated CSV into Power BI or Tableau.
 
-# Skill database
-SKILL_DATABASE = {
-    "programming": [...],
-    "data_science": [...],
-    # Add or modify skills here
-}
+### BI Dataset Schema
 
-# Career roles
-CAREER_ROLES = {
-    "data_scientist": {...},
-    # Add or modify roles here
-}
-```
-
----
-
-## 🛠️ Advanced Features
-
-### Skill Extraction Engine
-- **Pattern Matching:** Uses regex patterns for accurate skill detection
-- **Boundary-Aware:** Ensures words like "python" in "cpython" aren't false positives
-- **Categorization:** Automatically categorizes skills into 8 categories
-- **Experience Detection:** Extracts years of experience from text
-
-### Matching Algorithm
-- Similarity scoring based on matched vs. required skills
-- Considers missing and extra skills in ranking
-- Weighted scoring for better candidate prioritization
-
-### Career Role Database
-Includes predefined roles with:
-- Required skills
-- Job descriptions
-- Salary ranges
-- Growth potential
+| Field Name | Type | Description |
+|:---|:---:|:---|
+| `analysis_date` | String (ISO) | Timestamp of analysis run |
+| `jd_index` | Integer | Sequential JD identifier |
+| `jd_name` | String | Name/filename of the Job Description |
+| `candidate_name` | String | Filename of candidate resume |
+| `candidate_rank` | Integer | Rank position within the JD pool |
+| `fit_score` | Integer | Overall job match percentage (0-100) |
+| `ats_score` | Integer | ATS compatibility score (0-100) |
+| `ats_rating` | String | Excellent / Good / Fair / Poor |
+| `matched_count` | Integer | Count of matched skills |
+| `missing_count` | Integer | Count of missing required skills |
+| `extra_count` | Integer | Count of extra candidate skills |
+| `required_skills_count` | Integer | Total skills required by JD |
+| `skill_name` | String | Name of skill evaluated |
+| `skill_status` | String | Matched / Missing / Extra / Required / Related |
+| `is_required` | Binary (0/1) | Flag indicating if skill is required by JD |
+| `is_matched` | Binary (0/1) | Flag indicating if candidate matches skill |
+| `is_missing` | Binary (0/1) | Flag indicating if candidate is missing skill |
+| `is_extra` | Binary (0/1) | Flag indicating candidate has extra skill |
 
 ---
 
-## 📊 Power BI / Tableau Integration
+## 🚀 Deployment Guide (Vercel Serverless)
 
-After running recruiter analysis:
+InterSyncIQ is configured for serverless deployment on **Vercel** with zero backend infrastructure configuration required.
 
-1. Export results as CSV from the "Analysis Results" section
-2. Use **Power BI Desktop** or **Tableau** to import the CSV
-3. Build dashboards with fields:
-   - `candidate_name`, `candidate_rank`, `fit_score`
-   - `skill_name`, `skill_status` (Matched/Missing/Extra/Required)
-   - `is_matched`, `is_missing`, `is_extra`, `is_required`
-
-**Example Visualizations:**
-- Fit score distribution across candidates
-- Missing skill heatmaps by candidate
-- Top candidates vs. JD requirements
-- Skill gap analysis
-
----
-
-## 🚀 Deployment Guide (Vercel)
-
-InterSyncIQ is live on **Vercel** at: **https://inter-sync-iq.vercel.app**
-
-Vercel is a modern serverless platform optimized for Python applications.
-
-### Access the Live Application
-
-🌐 **Live URL:** [https://inter-sync-iq.vercel.app](https://inter-sync-iq.vercel.app)
-
-### Prerequisites for Deployment
-
-- GitHub account with repository access
-- Vercel account (free tier available at [vercel.com](https://vercel.com))
-
-### Quick Deployment Options
-
-#### Option 1: Deploy via Vercel CLI (Recommended)
+### Deploy via Vercel CLI
 
 ```bash
+# Install Vercel CLI globally
 npm install -g vercel
+
+# Deploy to preview / production
 vercel
 ```
 
-#### Option 2: Deploy via GitHub Integration
+### Deploy via GitHub Integration
 
-1. **Push to GitHub**
+1. Push your code to GitHub:
    ```bash
    git add .
-   git commit -m "Ready for Vercel deployment"
+   git commit -m "Deploy to Vercel"
    git push origin main
    ```
-
-2. **Deploy on Vercel**
-   - Go to [vercel.com](https://vercel.com) and sign in
-   - Click "New Project"
-   - Select your GitHub repository
-   - Click "Import"
-   - Vercel auto-detects Python and deploys automatically
-
-3. **Access Your Live App**
-   - App is live globally within 2-3 minutes
-   - Auto-deploys on every GitHub push
-   - Live at: **https://inter-sync-iq.vercel.app**
-
-### How It Works
-
-**Vercel Configuration:**
-- `vercel.json` – Defines serverless function, rewrites, and environment
-- `api/index.py` – Flask app runs as a serverless function
-- `static/` & `templates/` – Served as static assets
-- Automatic scaling and 99.99% uptime
-- Free SSL/TLS included
-
-### Local Testing Before Deployment
-
-To test locally before deployment:
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run locally (like app.py)
-python app.py
-
-# Visit http://localhost:5000
-```
-
-### Monitoring & Management
-
-**View Logs:**
-- Vercel Dashboard → Select project → Deployments tab
-- Click deployment → Logs section
-
-**View Analytics:**
-- Vercel Dashboard → Analytics tab
-- Monitor bandwidth, requests, performance
-
-**Environment Variables:**
-- Project Settings → Environment Variables
-- Add custom environment variables as needed
-
-**Custom Domain:**
-- Project Settings → Domains
-- Add your custom domain (requires DNS configuration)
-
-### Key Files for Deployment
-
-| File | Purpose |
-|------|---------|
-| `api/index.py` | Serverless Flask function (Vercel entry point) |
-| `vercel.json` | Vercel configuration (routing, env, memory) |
-| `requirements.txt` | Python dependencies |
-| `.vercelignore` | Files to exclude from deployment |
-| `static/` | CSS, JavaScript, assets |
-| `templates/` | HTML templates |
-
-### Troubleshooting Deployment
-
-**500 Errors on API Calls:**
-- Check Vercel Logs for error messages
-- Verify all dependencies are in `requirements.txt`
-
-**Static Files Not Loading:**
-- Ensure `static/` and `templates/` folders exist
-- Check `vercel.json` configuration
-
-**Build Failure:**
-- Make sure `requirements.txt` has all dependencies
-- Check Python version compatibility (3.8+)
-
-### Rolling Back Deployment
-
-If deployment has issues:
-1. Go to Vercel dashboard
-2. Deployments tab → Select previous working deployment
-3. Click "Redeploy" to go back to previous version
-
-**Enable Auto-Deploy:**
-1. Connect GitHub repository in Render
-2. Any push to `main` branch triggers automatic deployment
-3. See deployment progress in Render dashboard
-4. Rollback available if build fails
+2. Open [Vercel Dashboard](https://vercel.com) and click **Import Project**.
+3. Select your repository. Vercel automatically detects `vercel.json` and `api/index.py`.
+4. Click **Deploy**.
 
 ---
 
-## �🚨 Troubleshooting
+## 🔍 Supported Skill Taxonomy
 
-### Issue: "Port 5000 already in use"
-**Solution:** Change the port in `app.py`:
-```python
-if __name__ == '__main__':
-    app.run(debug=True, port=5001)  # Use 5001 instead
-```
-
-### Issue: PDF files not parsing correctly
-**Solution:** Ensure PyPDF2 is installed and up-to-date:
-```bash
-pip install --upgrade PyPDF2
-```
-
-### Issue: Large files timing out
-**Solution:** Increase the timeout and max content length:
-```python
-app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB
-```
-
-### Issue: CORS errors in browser console
-**Solution:** Ensure `flask-cors` is installed:
-```bash
-pip install flask-cors
-```
+- **Programming:** Python, Java, JavaScript, TypeScript, C++, C#, Ruby, PHP, Swift, Kotlin, Go, Rust
+- **Data Science & ML:** Pandas, NumPy, Scikit-learn, TensorFlow, PyTorch, Keras, Spark, Hadoop, Hive, Pig
+- **Databases:** SQL, MySQL, PostgreSQL, MongoDB, Redis, Cassandra, Elasticsearch, Oracle, SQLite
+- **Cloud & DevOps:** AWS, Azure, Google Cloud, Docker, Kubernetes, Terraform, Ansible, Jenkins, CI/CD
+- **Web Development:** HTML, CSS, React, Angular, Vue, Django, Flask, Node.js, Express, REST API, GraphQL
+- **Analytics:** Tableau, Power BI, Excel, SAS, SPSS, Matplotlib, Seaborn, Plotly
+- **Soft Skills:** Communication, Leadership, Teamwork, Problem Solving, Critical Thinking, Creativity, Adaptability
+- **Business & Agile:** Project Management, Agile, Scrum, Jira, Confluence, Product Management, Strategy
 
 ---
 
-## 🔍 Supported Skills
+## 📝 License & Contributions
 
-**Programming Languages:** Python, Java, JavaScript, C++, C#, Ruby, PHP, Swift, Kotlin, Go, Rust, TypeScript
-
-**Data Science:** Pandas, NumPy, Scikit-learn, TensorFlow, PyTorch, Keras, Spark, Hadoop
-
-**Databases:** SQL, MySQL, PostgreSQL, MongoDB, Redis, Cassandra, Elasticsearch, Oracle
-
-**Cloud & DevOps:** AWS, Azure, Google Cloud, Docker, Kubernetes, Terraform, Ansible, Jenkins
-
-**Web Development:** HTML, CSS, React, Angular, Vue, Django, Flask, Node.js, Express, REST API, GraphQL
-
-**Analytics:** Tableau, Power BI, Excel, SAS, SPSS, Matplotlib, Seaborn, Plotly
-
-**Soft Skills:** Communication, Leadership, Teamwork, Problem Solving, Critical Thinking, Creativity
-
-**Business:** Project Management, Agile, Scrum, Jira, Confluence, Product Management, Strategy
-
----
-
-## 📝 License
-
-This project is provided as-is for recruitment and career guidance purposes. Modify and distribute as needed.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! To contribute:
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Commit changes: `git commit -m "Add your feature"`
-4. Push to branch: `git push origin feature/your-feature`
-5. Submit a pull request
-
-### Enhancement Ideas
-- Add support for DOCX parsing
-- Integrate with OpenAI for advanced NLP
-- Add user authentication and job history tracking
-- Build admin dashboard for skill database management
-- Add resume parsing with ML-based layout detection
-- Implement skill weight/importance scoring
-
----
-
-## 📞 Support & Feedback
-
-For issues, feature requests, or feedback:
-- Open an issue on GitHub
-- Contact: [your-email@example.com]
-
----
-
-## 🎓 Learning Resources
-
-- [Flask Documentation](https://flask.palletsprojects.com/)
-- [PyPDF2 Guide](https://github.com/py-pdf/PyPDF2)
-- [JavaScript Resume Parsing](https://developer.mozilla.org/en-US/docs/Web/API/FileReader)
-- [Skill Extraction Techniques](https://github.com/topics/skill-extraction)
+This project is provided open-source under the MIT License for talent acquisition and career planning. Contributions, issues, and feature pull requests are welcome!

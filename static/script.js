@@ -726,12 +726,18 @@ function renderStatistics(data, targetGrid = statsGrid) {
         ? Math.round(results.reduce((sum, r) => sum + (r.fit || 0), 0) / results.length)
         : 0;
     const maxFit = results.length ? Math.max(...results.map(r => r.fit || 0)) : 0;
+    const avgAts = results.length
+        ? Math.round(results.reduce((sum, r) => sum + (r.ats_score || 0), 0) / results.length)
+        : 0;
+    const maxAts = results.length ? Math.max(...results.map(r => r.ats_score || 0)) : 0;
     const totalSkills = results.reduce((sum, r) => sum + (r.matched?.length || 0) + (r.extras?.length || 0), 0);
     const avgSkills = results.length ? Math.round(totalSkills / results.length) : 0;
     
     const stats = [
         { label: "Average Fit", value: `${avgFit}%`, icon: "fa-chart-line" },
         { label: "Best Fit", value: `${maxFit}%`, icon: "fa-trophy" },
+        { label: "Average ATS", value: `${avgAts}%`, icon: "fa-robot" },
+        { label: "Best ATS", value: `${maxAts}%`, icon: "fa-star" },
         { label: "Candidates", value: results.length, icon: "fa-users" },
         { label: "Avg Skills", value: avgSkills, icon: "fa-cogs" }
     ];
@@ -757,6 +763,7 @@ function renderComparisonTable(candidates, targetContainer = resultsContent) {
     header.innerHTML = `
         <div>Resume</div>
         <div>Match Score</div>
+        <div>ATS Score</div>
         <div>Matched Skills</div>
         <div>Missing Skills</div>
         <div>Recommendations</div>
@@ -787,6 +794,16 @@ function renderComparisonTable(candidates, targetContainer = resultsContent) {
             </div>
         `;
 
+        const atsCell = document.createElement('div');
+        atsCell.className = 'comparison-cell ats-cell';
+        atsCell.setAttribute('data-label', 'ATS Score');
+        const atsScore = candidate.ats_score || 0;
+        const atsColor = atsScore >= 85 ? '#4cc9f0' : atsScore >= 70 ? '#f8961e' : '#f94144';
+        atsCell.innerHTML = `
+            <div class="ats-value" style="color: ${atsColor}">${atsScore}%</div>
+            <div class="ats-rating">${candidate.ats_rating || "Fair"}</div>
+        `;
+
         const matchedCell = document.createElement('div');
         matchedCell.className = 'comparison-cell';
         matchedCell.setAttribute('data-label', 'Matched Skills');
@@ -804,6 +821,7 @@ function renderComparisonTable(candidates, targetContainer = resultsContent) {
 
         row.appendChild(resumeCell);
         row.appendChild(scoreCell);
+        row.appendChild(atsCell);
         row.appendChild(matchedCell);
         row.appendChild(missingCell);
         row.appendChild(recommendationsCell);
@@ -975,18 +993,25 @@ function showCandidateDetails(index) {
     if (!primaryResults[index]) return;
 
     const candidate = primaryResults[index];
+    const atsScore = candidate.ats_score || 0;
+    const atsColor = atsScore >= 85 ? '#4cc9f0' : atsScore >= 70 ? '#f8961e' : '#f94144';
     
     modalBody.innerHTML = `
         <div class="candidate-details">
             <div class="detail-header">
                 <h3>${candidate.name}</h3>
-                <div class="detail-score" style="color: ${candidate.fit >= 80 ? '#4cc9f0' : candidate.fit >= 60 ? '#f8961e' : '#f94144'}">
-                    ${candidate.fit}% Match
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    <div class="detail-score" style="color: ${candidate.fit >= 80 ? '#4cc9f0' : candidate.fit >= 60 ? '#f8961e' : '#f94144'}">
+                        ${candidate.fit}% Match Score
+                    </div>
+                    <div class="detail-score ats-detail-score" style="color: ${atsColor}">
+                        ${atsScore}% ATS Score
+                    </div>
                 </div>
             </div>
             
             <div class="detail-section">
-                <h4><i class="fas fa-chart-pie"></i> Match Breakdown</h4>
+                <h4><i class="fas fa-chart-pie"></i> Match & ATS Breakdown</h4>
                 <div class="match-breakdown">
                     <div class="breakdown-item">
                         <div class="breakdown-label">Matched Skills</div>
@@ -1000,8 +1025,21 @@ function showCandidateDetails(index) {
                         <div class="breakdown-label">Extra Skills</div>
                         <div class="breakdown-value">${candidate.extras.length}</div>
                     </div>
+                    <div class="breakdown-item">
+                        <div class="breakdown-label">ATS Rating</div>
+                        <div class="breakdown-value">${candidate.ats_rating || "Fair"}</div>
+                    </div>
                 </div>
             </div>
+
+            ${candidate.ats_improvements && candidate.ats_improvements.length > 0 ? `
+            <div class="detail-section">
+                <h4><i class="fas fa-robot"></i> ATS Optimization Tips</h4>
+                <ul class="ats-improvements-list">
+                    ${candidate.ats_improvements.map(imp => `<li>${escapeHtml(imp)}</li>`).join('')}
+                </ul>
+            </div>
+            ` : ''}
             
             <div class="detail-section">
                 <h4><i class="fas fa-check-circle" style="color: #4cc9f0;"></i> Matched Skills</h4>
@@ -1230,13 +1268,15 @@ function buildBIRows(analyses = []) {
     return analyses.flatMap((analysis, jdIndex) => {
         const requiredSkills = (analysis.required_skills || []).map(skill => (skill || "").trim()).filter(Boolean);
         const requiredSet = new Set(requiredSkills.map(skill => skill.toLowerCase()));
-
+                return {
         return (analysis.results || []).flatMap((candidate, candidateIndex) => {
             const matched = (candidate.matched || []).map(skill => (skill || "").trim()).filter(Boolean);
             const missing = (candidate.missing || []).map(skill => (skill || "").trim()).filter(Boolean);
             const extras = (candidate.extras || []).map(skill => (skill || "").trim()).filter(Boolean);
 
             const matchedSet = new Set(matched.map(skill => skill.toLowerCase()));
+                    ats_score: candidate.ats_score ?? 0,
+                    ats_rating: candidate.ats_rating || "",
             const missingSet = new Set(missing.map(skill => skill.toLowerCase()));
             const extrasSet = new Set(extras.map(skill => skill.toLowerCase()));
 
@@ -1287,6 +1327,8 @@ function buildBIRows(analyses = []) {
                     candidate_name: candidate.name || "Unknown Candidate",
                     candidate_rank: candidateIndex + 1,
                     fit_score: candidate.fit ?? 0,
+                    ats_score: candidate.ats_score ?? 0,
+                    ats_rating: candidate.ats_rating || "",
                     matched_count: candidate.matched_count ?? matched.length,
                     missing_count: candidate.missing_count ?? missing.length,
                     extra_count: candidate.extra_count ?? extras.length,
@@ -1341,6 +1383,9 @@ function exportToCSV() {
         "Missing Skills",
         "Extra Skills",
         "Required Skills",
+        "ATS Score",
+        "ATS Rating",
+        "ATS Improvements",
         "Recommendations",
         "Final Verdict"
     ];
@@ -1360,6 +1405,9 @@ function exportToCSV() {
                 (candidate.missing || []).join(", "),
                 (candidate.extras || []).join(", "),
                 (analysis.required_skills || []).join(", "),
+                candidate.ats_score ?? 0,
+                candidate.ats_rating || "",
+                (candidate.ats_improvements || []).join(" | "),
                 (candidate.recommendations || []).join(" | "),
                 candidate.verdict_label || candidate.verdict || getVerdictFromFit(candidate.fit)
             ];
@@ -1402,6 +1450,9 @@ function exportToExcel() {
                 "Missing Skills": (candidate.missing || []).join(", "),
                 "Extra Skills": (candidate.extras || []).join(", "),
                 "Required Skills": (analysis.required_skills || []).join(", "),
+                "ATS Score (%)": candidate.ats_score ?? 0,
+                "ATS Rating": candidate.ats_rating || "",
+                "ATS Improvements": (candidate.ats_improvements || []).join(" | "),
                 "Recommendations": (candidate.recommendations || []).join(" | "),
                 "Final Verdict": candidate.verdict_label || candidate.verdict || getVerdictFromFit(candidate.fit)
             }))
@@ -1436,6 +1487,9 @@ function exportToExcel() {
             { wch: 40 }, // Missing Skills
             { wch: 40 }, // Extra Skills
             { wch: 45 }, // Required Skills
+            { wch: 12 }, // ATS Score
+            { wch: 14 }, // ATS Rating
+            { wch: 50 }, // ATS Improvements
             { wch: 50 }, // Recommendations
             { wch: 18 }  // Final Verdict
         ];
@@ -1630,14 +1684,19 @@ function renderCandidateResults(data) {
 
     const activeAnalysis = analyses[selectedCandidateJDIndex] || analyses[0];
 
-    // Update fit score
+    // Update fit score and ATS score
     const fitScore = activeAnalysis.fit_score;
+    const atsScore = activeAnalysis.ats_score || 0;
+    
     candidateFitScore.textContent = `${fitScore}%`;
     fitFeedback.textContent = getFitFeedback(fitScore, activeAnalysis.skills?.missing?.length || 0);
     
     // Update progress circle
     const progress = (fitScore / 100) * 360;
     candidateFitCircle.style.background = `conic-gradient(var(--primary) ${progress}deg, var(--gray-light) 0deg)`;
+    
+    // Render ATS score section
+    renderCandidateATSScore(activeAnalysis);
     
     // Render skills
     renderCandidateSkills(activeAnalysis.skills.matched, candidateMatched, "matched");
@@ -1687,6 +1746,68 @@ function renderCandidateSkills(skills, container, type) {
         chip.addEventListener('click', () => showSkillDetails(skill, type));
         container.appendChild(chip);
     });
+}
+
+function renderCandidateATSScore(analysis) {
+    // Find or create ATS score section
+    let atsSection = document.getElementById('candidateATSSection');
+    if (!atsSection) {
+        // Create the section if it doesn't exist
+        atsSection = document.createElement('div');
+        atsSection.id = 'candidateATSSection';
+        atsSection.className = 'candidate-ats-section';
+        
+        // Insert after the fit score section
+        const fitSection = document.querySelector('.fit-score-section') || candidateFitCircle.closest('.section-card');
+        if (fitSection && fitSection.parentNode) {
+            fitSection.parentNode.insertBefore(atsSection, fitSection.nextSibling);
+        }
+    }
+    
+    const atsScore = analysis.ats_score || 0;
+    const atsRating = analysis.ats_rating || "Fair";
+    const atsColor = atsScore >= 85 ? '#4cc9f0' : atsScore >= 70 ? '#f8961e' : '#f94144';
+    const atsImprovements = analysis.ats_improvements || [];
+    
+    atsSection.innerHTML = `
+        <div class="section-card">
+            <div class="section-header">
+                <i class="fas fa-robot"></i>
+                <h2>ATS (Applicant Tracking System) Score</h2>
+            </div>
+            <div class="section-body">
+                <div class="ats-score-display">
+                    <div class="ats-circle" style="border: 8px solid ${atsColor};">
+                        <div class="ats-score-value" style="color: ${atsColor};">${atsScore}%</div>
+                        <div class="ats-score-label">ATS Score</div>
+                    </div>
+                    <div class="ats-details">
+                        <h3>ATS Compatibility Rating: <span style="color: ${atsColor}; font-weight: bold;">${atsRating}</span></h3>
+                        <p class="ats-description">
+                            ${atsScore >= 85 ? 'Excellent! Your resume is highly optimized for ATS parsing. It should pass through most automated screening systems without issues.' :
+                              atsScore >= 70 ? 'Good! Your resume has strong ATS compatibility. A few minor improvements could make it even better.' :
+                              atsScore >= 50 ? 'Fair. Your resume has ATS compatibility issues. Consider the suggestions below to improve parsing.' :
+                              'Poor. Your resume may have significant ATS compatibility problems. Address the suggestions to improve your chances.'}
+                        </p>
+                        
+                        ${atsImprovements.length > 0 ? `
+                        <div class="ats-improvements">
+                            <h4><i class="fas fa-lightbulb"></i> How to Improve Your ATS Score:</h4>
+                            <ul class="improvements-list">
+                                ${atsImprovements.map(imp => `
+                                    <li>
+                                        <i class="fas fa-check-circle"></i>
+                                        <span>${escapeHtml(imp)}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 function getFitFeedback(fitScore, missingCount = 0) {
