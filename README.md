@@ -31,6 +31,7 @@ InterSyncIQ features two tailored operational modes:
 ## ✨ Key Features
 
 - **ATS Scoring Engine**: 4-part automated scoring evaluating Structure (40%), Keywords (30%), Formatting (20%), and Achievements (10%).
+- **TF-IDF & Cosine Similarity Engine**: Semantic text similarity evaluation powered by `scikit-learn` (`TfidfVectorizer` & `cosine_similarity`).
 - **Multi-Job Description Support**: Evaluate resumes against multiple JDs concurrently with independent scoring and UI tab/dropdown switching.
 - **Zero-Dependency DOCX Parsing**: Native XML zip extraction for Word files (`.docx`) without requiring heavy external Python libraries.
 - **Boundary-Aware Regex Skill Matching**: Precision skill detection preventing false positives (e.g., distinguishing "python" from "cpython").
@@ -44,8 +45,8 @@ InterSyncIQ features two tailored operational modes:
 
 ```
 InterSyncIQ/
-├── app.py                 # Core Flask backend server (API endpoints, skill matching, ATS engine)
-├── requirements.txt       # Python dependencies (Flask, Flask-CORS, PyPDF2, Werkzeug)
+├── app.py                 # Core Flask backend server (API endpoints, skill matching, ATS & TF-IDF similarity engines)
+├── requirements.txt       # Python dependencies (Flask, Flask-CORS, PyPDF2, Werkzeug, scikit-learn)
 ├── README.md              # Project documentation
 ├── VERCEL_DEPLOYMENT.md   # Deployment guide for Vercel Serverless
 ├── Procfile               # Process configuration for Heroku/Render
@@ -66,6 +67,7 @@ InterSyncIQ/
 ## 🧩 Tech Stack
 
 - **Backend Framework:** Python 3.8+ with Flask 2.3.3 & Flask-CORS
+- **NLP & Machine Learning:** Scikit-learn (`TfidfVectorizer`, `cosine_similarity`) for TF-IDF text similarity
 - **Document Parsing:** PyPDF2 (PDF text extraction), Python `zipfile` & `xml.etree` (native DOCX parsing)
 - **Frontend Architecture:** Vanilla HTML5, CSS3 (Modern Glassmorphism & Animations), ES6 JavaScript
 - **Data Export & Visualizations:** SheetJS (`xlsx.full.min.js`), Chart.js
